@@ -1,0 +1,7 @@
+namespace test
+
+import "circular_b.dv"
+
+hub A {
+    business_key a_id : int
+}

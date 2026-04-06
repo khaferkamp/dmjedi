@@ -1,0 +1,5 @@
+namespace test
+
+hub Customer {
+    business_key customer_id : int
+}
