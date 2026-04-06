@@ -12,9 +12,11 @@ from dmjedi.cli.errors import format_parse_error, print_diagnostics
 from dmjedi.docs.markdown import generate_markdown
 from dmjedi.generators import registry
 from dmjedi.lang.ast import DVMLModule
+from dmjedi.lang.discovery import discover_dv_files
+from dmjedi.lang.imports import CircularImportError, resolve_imports
 from dmjedi.lang.linter import LintDiagnostic, Severity, lint
 from dmjedi.lang.parser import parse_file
-from dmjedi.model.resolver import resolve
+from dmjedi.model.resolver import ResolverErrors, resolve
 
 app = typer.Typer(
     name="dmjedi",
@@ -25,40 +27,39 @@ app = typer.Typer(
 
 @app.command()
 def validate(
-    paths: list[Path] = typer.Argument(..., help="DVML files to validate"),
+    paths: list[Path] = typer.Argument(..., help="DVML files or directories to validate"),
 ) -> None:
     """Validate DVML model files."""
     console = Console(stderr=True)
-    all_diagnostics: list[LintDiagnostic] = []
-    has_parse_error = False
+    modules = _parse_all(paths, console)
 
-    for path in paths:
-        if not path.exists():
-            console.print(f"[red]Error:[/red] File not found: {path}")
-            raise typer.Exit(code=1)
-        try:
-            module = parse_file(path)
-        except UnexpectedInput as e:
-            console.print(format_parse_error(e, str(path)))
-            has_parse_error = True
-            continue
-        diags = lint(module)
-        all_diagnostics.extend(diags)
+    all_diagnostics: list[LintDiagnostic] = []
+    for module in modules:
+        all_diagnostics.extend(lint(module))
 
     if all_diagnostics:
         print_diagnostics(all_diagnostics, console)
 
     error_count = sum(1 for d in all_diagnostics if d.severity == Severity.ERROR)
-    if has_parse_error or error_count > 0:
+    if error_count > 0:
         raise typer.Exit(code=1)
 
-    if not has_parse_error and not all_diagnostics:
+    # Also run resolver to catch cross-module errors
+    try:
+        resolve(modules)
+    except ResolverErrors as e:
+        for err in e.errors:
+            loc = f"{err.source_file}:{err.line} " if err.source_file else ""
+            console.print(f"[red]E[/red] {loc}{err.message}")
+        raise typer.Exit(code=1) from None
+
+    if not all_diagnostics:
         console.print("[green]All files valid.[/green]")
 
 
 @app.command()
 def generate(
-    paths: list[Path] = typer.Argument(..., help="DVML files"),
+    paths: list[Path] = typer.Argument(..., help="DVML files or directories"),
     target: str = typer.Option("spark-declarative", "--target", "-t", help="Generator target"),
     output: Path = typer.Option("output", "--output", "-o", help="Output directory"),
 ) -> None:
@@ -78,7 +79,13 @@ def generate(
         raise typer.Exit(code=1)
 
     # Resolve
-    model = resolve(modules)
+    try:
+        model = resolve(modules)
+    except ResolverErrors as e:
+        for err in e.errors:
+            loc = f"{err.source_file}:{err.line} " if err.source_file else ""
+            console.print(f"[red]E[/red] {loc}{err.message}")
+        raise typer.Exit(code=1) from None
 
     # Generate
     try:
@@ -96,7 +103,7 @@ def generate(
 
 @app.command()
 def docs(
-    paths: list[Path] = typer.Argument(..., help="DVML files"),
+    paths: list[Path] = typer.Argument(..., help="DVML files or directories"),
     output: Path = typer.Option("output/docs", "--output", "-o", help="Output directory"),
 ) -> None:
     """Generate markdown documentation from DVML models."""
@@ -113,7 +120,14 @@ def docs(
     if error_count > 0:
         raise typer.Exit(code=1)
 
-    model = resolve(modules)
+    try:
+        model = resolve(modules)
+    except ResolverErrors as e:
+        for err in e.errors:
+            loc = f"{err.source_file}:{err.line} " if err.source_file else ""
+            console.print(f"[red]E[/red] {loc}{err.message}")
+        raise typer.Exit(code=1) from None
+
     markdown = generate_markdown(model)
 
     output.mkdir(parents=True, exist_ok=True)
@@ -130,17 +144,37 @@ def lsp() -> None:
 
 
 def _parse_all(paths: list[Path], console: Console) -> list[DVMLModule]:
-    """Parse all .dv files, printing errors and exiting on failure."""
+    """Discover, parse, and resolve imports for all .dv files."""
+    # Step 1: Discover files
+    try:
+        dv_files = discover_dv_files(paths)
+    except FileNotFoundError as e:
+        console.print(f"[red]Error:[/red] File not found: {e}")
+        raise typer.Exit(code=1) from None
+
+    if not dv_files:
+        console.print("[yellow]Warning:[/yellow] No .dv files found in the given paths.")
+        raise typer.Exit(code=1)
+
+    # Step 2: Parse all discovered files
     modules: list[DVMLModule] = []
-    for path in paths:
-        if not path.exists():
-            console.print(f"[red]Error:[/red] File not found: {path}")
-            raise typer.Exit(code=1)
+    for path in dv_files:
         try:
             modules.append(parse_file(path))
         except UnexpectedInput as e:
             console.print(format_parse_error(e, str(path)))
             raise typer.Exit(code=1) from None
+
+    # Step 3: Resolve imports
+    try:
+        modules = resolve_imports(modules)
+    except CircularImportError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(code=1) from None
+    except FileNotFoundError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(code=1) from None
+
     return modules
 
 

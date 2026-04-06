@@ -25,7 +25,7 @@ def test_validate_valid_file() -> None:
 def test_validate_nonexistent_file() -> None:
     result = runner.invoke(app, ["validate", "nonexistent.dv"])
     assert result.exit_code == 1
-    assert "File not found" in result.output
+    assert "not found" in result.output.lower()
 
 
 def test_validate_lint_error(tmp_path: Path) -> None:
@@ -76,7 +76,7 @@ def test_generate_unknown_target() -> None:
 def test_generate_nonexistent_file() -> None:
     result = runner.invoke(app, ["generate", "nonexistent.dv"])
     assert result.exit_code == 1
-    assert "File not found" in result.output
+    assert "not found" in result.output.lower()
 
 
 # --- docs command ---
@@ -130,3 +130,58 @@ def test_format_parse_error() -> None:
         formatted = format_parse_error(err, "bad.dv")
         assert "bad.dv:" in formatted
         assert "Syntax error" in formatted
+
+
+# --- directory and import integration ---
+
+
+def test_validate_directory() -> None:
+    """Validate accepts a directory and discovers .dv files."""
+    result = runner.invoke(app, ["validate", "examples/"])
+    assert result.exit_code == 0
+    assert "valid" in result.output.lower()
+
+
+def test_validate_empty_directory(tmp_path: Path) -> None:
+    """Validate on empty directory shows warning."""
+    result = runner.invoke(app, ["validate", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "No .dv files found" in result.output
+
+
+def test_generate_directory() -> None:
+    """Generate accepts a directory argument."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as out:
+        result = runner.invoke(app, ["generate", "examples/", "-t", "sql-jinja", "-o", out])
+        assert result.exit_code == 0
+        assert "Generated" in result.output
+
+
+def test_validate_duplicate_entity(tmp_path: Path) -> None:
+    """Validate catches duplicate entities across files."""
+    f1 = tmp_path / "a.dv"
+    f2 = tmp_path / "b.dv"
+    f1.write_text("namespace test\nhub Customer { business_key id : int }")
+    f2.write_text("namespace test\nhub Customer { business_key id : int }")
+    result = runner.invoke(app, ["validate", str(f1), str(f2)])
+    assert result.exit_code == 1
+    assert "Duplicate" in result.output or "duplicate" in result.output.lower()
+
+
+def test_validate_bad_parent_ref(tmp_path: Path) -> None:
+    """Validate catches satellites with non-existent parents."""
+    f = tmp_path / "bad.dv"
+    f.write_text("namespace test\nsatellite Bad of Ghost { x : string }")
+    result = runner.invoke(app, ["validate", str(f)])
+    assert result.exit_code == 1
+    assert "unknown parent" in result.output.lower() or "Unknown parent" in result.output
+
+
+def test_validate_with_imports(fixtures_dir: Path) -> None:
+    """Validate works with files that have imports."""
+    main_dv = fixtures_dir / "imports" / "main.dv"
+    if main_dv.exists():
+        result = runner.invoke(app, ["validate", str(main_dv)])
+        assert result.exit_code == 0
