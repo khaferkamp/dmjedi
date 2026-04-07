@@ -1,0 +1,48 @@
+# Sales domain — example DVML model
+
+namespace sales
+
+hub Customer {
+    business_key customer_id : int
+}
+
+satellite CustomerDetails of Customer {
+    first_name  : string
+    last_name   : string
+    email       : string
+    registered  : timestamp
+}
+
+hub Product {
+    business_key product_id : int
+    business_key sku        : string
+}
+
+satellite ProductInfo of Product {
+    product_name : string
+    category     : string
+    price        : decimal
+}
+
+hub Store {
+    business_key store_id : int
+}
+
+satellite StoreInfo of Store {
+    store_name : string
+    city       : string
+    country    : string
+}
+
+link Sale {
+    references Customer, Product, Store
+    sale_date : timestamp
+    quantity  : int
+    amount    : decimal
+}
+
+satellite SaleContext of Sale {
+    channel    : string
+    discount   : decimal
+    payment    : string
+}
