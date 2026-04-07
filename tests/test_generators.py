@@ -192,3 +192,73 @@ def test_sql_jinja_postgres_dialect():
     assert "TEXT" in hub_sql  # record_source mapped to TEXT for postgres
     sat_sql = result.files["satellites/CustomerDetails.sql"]
     assert "TEXT" in sat_sql  # first_name mapped to TEXT for postgres
+
+
+# --- Spark DLT functional tests ---
+
+
+def test_spark_hub_output_functional():
+    """Hub generates functional DLT code with hash key, load_ts, record_source, distinct."""
+    gen = registry.get("spark-declarative")
+    result = gen.generate(_sample_model())
+    code = result.files["hubs/Customer.py"]
+    assert "import dlt" in code
+    assert "@dlt.table(" in code
+    assert 'name="hub_Customer"' in code
+    assert 'F.sha2(F.concat_ws("||"' in code
+    assert 'F.current_timestamp().alias("load_ts")' in code
+    assert 'F.lit("dmjedi").alias("record_source")' in code
+    assert ".distinct()" in code
+    assert "customer_id" in code
+    # No stubs
+    lines = [ln.strip() for ln in code.splitlines()]
+    assert "pass" not in lines
+    assert not any("TODO" in ln for ln in lines)
+
+
+def test_spark_satellite_output_functional():
+    """Satellite generates DLT code with parent hk, hash_diff, user columns."""
+    gen = registry.get("spark-declarative")
+    result = gen.generate(_sample_model())
+    code = result.files["satellites/CustomerDetails.py"]
+    assert 'name="sat_CustomerDetails"' in code
+    assert "Customer_hk" in code
+    assert "hash_diff" in code
+    assert "first_name" in code
+    lines = [ln.strip() for ln in code.splitlines()]
+    assert "pass" not in lines
+    assert not any("TODO" in ln for ln in lines)
+
+
+def test_spark_link_output_functional():
+    """Link generates DLT code with composite hash key from hub ref hks."""
+    gen = registry.get("spark-declarative")
+    result = gen.generate(_sample_model())
+    code = result.files["links/CustomerProduct.py"]
+    assert 'name="link_CustomerProduct"' in code
+    assert "Customer_hk" in code
+    assert "Product_hk" in code
+    assert 'F.sha2(F.concat_ws("||"' in code
+    lines = [ln.strip() for ln in code.splitlines()]
+    assert "pass" not in lines
+    assert not any("TODO" in ln for ln in lines)
+
+
+def test_spark_link_no_extra_columns():
+    """Link with no extra columns still produces valid DLT output."""
+    model = DataVaultModel(
+        hubs={},
+        satellites={},
+        links={
+            "s.AB": Link(name="AB", namespace="s", hub_references=["A", "B"]),
+        },
+    )
+    gen = registry.get("spark-declarative")
+    result = gen.generate(model)
+    code = result.files["links/AB.py"]
+    assert 'name="link_AB"' in code
+    assert "A_hk" in code
+    assert "B_hk" in code
+    assert "import dlt" in code
+    lines = [ln.strip() for ln in code.splitlines()]
+    assert "pass" not in lines
