@@ -1,0 +1,14 @@
+# Product catalog entities
+
+namespace inventory
+
+hub Product {
+    business_key product_id : int
+    business_key sku        : string
+}
+
+satellite ProductInfo of Product {
+    product_name : string
+    category     : string
+    price        : decimal
+}

@@ -1,0 +1,13 @@
+# Customer entities
+
+namespace crm
+
+hub Customer {
+    business_key customer_id : int
+}
+
+satellite CustomerDetails of Customer {
+    first_name : string
+    last_name  : string
+    email      : string
+}
