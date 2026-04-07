@@ -1,0 +1,8 @@
+namespace test
+
+import "hub_defs.dv"
+
+satellite CustomerDetails of Customer {
+    first_name : string
+    last_name  : string
+}

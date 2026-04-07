@@ -1,0 +1,18 @@
+# Order entities — imports customers and products
+
+namespace sales
+
+import "customers.dv"
+import "products.dv"
+
+link Order {
+    references Customer, Product
+    order_date : timestamp
+    quantity   : int
+    amount     : decimal
+}
+
+satellite OrderContext of Order {
+    channel : string
+    payment : string
+}
