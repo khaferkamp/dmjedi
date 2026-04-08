@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from dmjedi.lang.parser import parse
-from dmjedi.model.core import Link
+from dmjedi.model.core import Link, NhLink, NhSat
 from dmjedi.model.resolver import ResolverErrors, resolve
 
 
@@ -87,3 +87,38 @@ def test_valid_parent_ref_passes():
     )
     model = resolve([mod])
     assert "test.Details" in model.satellites
+
+
+# --- NhSat / NhLink domain model tests ---
+
+
+def test_nhlink_requires_two_refs():
+    """NhLink with fewer than 2 hub_references raises ValidationError."""
+    with pytest.raises(ValidationError, match="at least 2 hubs"):
+        NhLink(name="bad_nhlink", hub_references=["OnlyOne"])
+
+
+def test_nhsat_qualified_name():
+    """NhSat qualified_name returns 'ns.Name' when namespace is set."""
+    nhsat = NhSat(name="Status", namespace="sales", parent_ref="Customer")
+    assert nhsat.qualified_name == "sales.Status"
+
+
+def test_nhlink_qualified_name():
+    """NhLink qualified_name returns 'ns.Name' when namespace is set."""
+    nhlink = NhLink(name="AB", namespace="ns", hub_references=["A", "B"])
+    assert nhlink.qualified_name == "ns.AB"
+
+
+def test_data_vault_model_has_nhsats_nhlinks():
+    """DataVaultModel can be constructed with nhsats and nhlinks dicts."""
+    from dmjedi.model.core import DataVaultModel
+
+    nhsat = NhSat(name="S", namespace="n", parent_ref="H")
+    nhlink = NhLink(name="L", namespace="n", hub_references=["A", "B"])
+    model = DataVaultModel(
+        nhsats={"n.S": nhsat},
+        nhlinks={"n.L": nhlink},
+    )
+    assert "n.S" in model.nhsats
+    assert "n.L" in model.nhlinks
