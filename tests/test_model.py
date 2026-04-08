@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from dmjedi.lang.parser import parse
-from dmjedi.model.core import EffSat, Link, NhLink, NhSat, SamLink
+from dmjedi.model.core import Bridge, EffSat, Link, NhLink, NhSat, Pit, SamLink
 from dmjedi.model.resolver import ResolverErrors, resolve
 
 
@@ -347,3 +347,44 @@ def test_samlink_empty_ref_raises():
     module = DVMLModule(namespace="test", samlinks=[decl])
     with pytest.raises(ResolverErrors, match="missing master"):
         resolve([module])
+
+
+# --- Bridge / PIT domain model tests ---
+
+
+def test_bridge_qualified_name():
+    """Bridge qualified_name returns 'ns.Name' when namespace is set."""
+    bridge = Bridge(name="CustProd", namespace="test", path=["Customer", "CustomerProduct", "Product"])
+    assert bridge.qualified_name == "test.CustProd"
+
+
+def test_bridge_qualified_name_no_namespace():
+    """Bridge qualified_name returns just 'Name' when namespace is empty."""
+    bridge = Bridge(name="CustProd", path=["C", "CP", "P"])
+    assert bridge.qualified_name == "CustProd"
+
+
+def test_pit_qualified_name():
+    """Pit qualified_name returns 'ns.Name' when namespace is set."""
+    pit = Pit(name="CustPit", namespace="test", anchor_ref="Customer", tracked_satellites=["Details"])
+    assert pit.qualified_name == "test.CustPit"
+
+
+def test_pit_qualified_name_no_namespace():
+    """Pit qualified_name returns just 'Name' when namespace is empty."""
+    pit = Pit(name="CustPit", anchor_ref="Customer")
+    assert pit.qualified_name == "CustPit"
+
+
+def test_data_vault_model_has_bridges_pits():
+    """DataVaultModel can be constructed with bridges and pits dicts."""
+    from dmjedi.model.core import DataVaultModel
+
+    bridge = Bridge(name="B", namespace="test", path=["A", "AB", "B"])
+    pit = Pit(name="P", namespace="test", anchor_ref="Customer")
+    model = DataVaultModel(
+        bridges={"test.B": bridge},
+        pits={"test.P": pit},
+    )
+    assert "test.B" in model.bridges
+    assert "test.P" in model.pits

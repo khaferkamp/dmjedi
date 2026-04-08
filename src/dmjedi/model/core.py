@@ -118,6 +118,31 @@ class SamLink(BaseModel):
         return f"{self.namespace}.{self.name}" if self.namespace else self.name
 
 
+class Bridge(BaseModel):
+    """A resolved bridge table (query-assist cross-hub traversal)."""
+
+    name: str
+    namespace: str = ""
+    path: list[str] = []
+
+    @property
+    def qualified_name(self) -> str:
+        return f"{self.namespace}.{self.name}" if self.namespace else self.name
+
+
+class Pit(BaseModel):
+    """A resolved point-in-time table (query-assist snapshot)."""
+
+    name: str
+    namespace: str = ""
+    anchor_ref: str
+    tracked_satellites: list[str] = []
+
+    @property
+    def qualified_name(self) -> str:
+        return f"{self.namespace}.{self.name}" if self.namespace else self.name
+
+
 class DataVaultModel(BaseModel):
     """A complete, resolved Data Vault 2.1 model built from one or more DVML modules."""
 
@@ -128,3 +153,5 @@ class DataVaultModel(BaseModel):
     nhlinks: dict[str, NhLink] = {}
     effsats: dict[str, EffSat] = {}
     samlinks: dict[str, SamLink] = {}
+    bridges: dict[str, Bridge] = {}
+    pits: dict[str, Pit] = {}
