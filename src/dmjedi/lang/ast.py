@@ -88,6 +88,35 @@ class EffSatDecl(BaseModel):
     loc: SourceLocation = SourceLocation()
 
 
+class SamLinkDecl(BaseModel):
+    """A same-as link declaration (master/duplicate cross-source matching)."""
+
+    name: str
+    master_ref: str
+    duplicate_ref: str
+    fields: list[FieldDef] = []
+    loc: SourceLocation = SourceLocation()
+
+
+class BridgeDecl(BaseModel):
+    """A bridge table declaration (query-assist cross-hub traversal)."""
+
+    name: str
+    path: list[str] = []  # ordered list of entity refs in the arrow chain
+    fields: list[FieldDef] = []
+    loc: SourceLocation = SourceLocation()
+
+
+class PitDecl(BaseModel):
+    """A point-in-time table declaration (query-assist snapshot)."""
+
+    name: str
+    anchor_ref: str  # the hub this PIT is anchored to
+    tracked_satellites: list[str] = []
+    fields: list[FieldDef] = []
+    loc: SourceLocation = SourceLocation()
+
+
 class DVMLModule(BaseModel):
     """A parsed DVML file containing all declarations."""
 
@@ -99,4 +128,7 @@ class DVMLModule(BaseModel):
     nhsats: list[NhSatDecl] = []
     nhlinks: list[NhLinkDecl] = []
     effsats: list[EffSatDecl] = []
+    samlinks: list[SamLinkDecl] = []
+    bridges: list[BridgeDecl] = []
+    pits: list[PitDecl] = []
     source_file: str = ""

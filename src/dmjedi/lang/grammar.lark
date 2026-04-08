@@ -32,6 +32,9 @@ statement: namespace_decl
          | nhsat_decl
          | nhlink_decl
          | effsat_decl
+         | samlink_decl
+         | bridge_decl
+         | pit_decl
          | import_decl
 
 // --- Imports ---
@@ -70,6 +73,27 @@ nhlink_member: references_decl | field_decl
 // --- Effectivity Satellite ---
 effsat_decl: "effsat" IDENTIFIER "of" qualified_ref "{" effsat_body "}"
 effsat_body: field_decl*
+
+// --- Same-As Link ---
+samlink_decl: "samlink" IDENTIFIER "{" samlink_body "}"
+samlink_body: samlink_member*
+samlink_member: master_ref | duplicate_ref | field_decl
+master_ref: "master" qualified_ref
+duplicate_ref: "duplicate" qualified_ref
+
+// --- Bridge ---
+bridge_decl: "bridge" IDENTIFIER "{" bridge_body "}"
+bridge_body: bridge_member*
+bridge_member: path_decl | field_decl
+path_decl: "path" path_chain
+path_chain: qualified_ref ("->" qualified_ref)+
+
+// --- Point-in-Time ---
+pit_decl: "pit" IDENTIFIER "{" pit_body "}"
+pit_body: pit_member*
+pit_member: pit_of | pit_tracks | field_decl
+pit_of: "of" qualified_ref
+pit_tracks: "tracks" qualified_ref ("," qualified_ref)*
 
 // --- Shared ---
 field_decl: IDENTIFIER ":" data_type

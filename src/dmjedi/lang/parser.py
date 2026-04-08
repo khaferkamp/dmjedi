@@ -7,6 +7,7 @@ from lark import Lark, Transformer, v_args
 from lark.exceptions import UnexpectedCharacters, UnexpectedEOF, UnexpectedInput, UnexpectedToken
 
 from dmjedi.lang.ast import (
+    BridgeDecl,
     BusinessKeyDef,
     DVMLModule,
     EffSatDecl,
@@ -16,6 +17,8 @@ from dmjedi.lang.ast import (
     LinkDecl,
     NhLinkDecl,
     NhSatDecl,
+    PitDecl,
+    SamLinkDecl,
     SatelliteDecl,
     SourceLocation,
 )
@@ -270,6 +273,95 @@ class DVMLTransformer(Transformer):  # type: ignore[type-arg]
             loc=self._loc(tree),
         )
 
+    def master_ref(self, tree: object) -> tuple[str, str]:
+        return ("master", tree.children[0])  # type: ignore[union-attr]
+
+    def duplicate_ref(self, tree: object) -> tuple[str, str]:
+        return ("duplicate", tree.children[0])  # type: ignore[union-attr]
+
+    def samlink_member(self, tree: object) -> tuple[str, str] | FieldDef:
+        return tree.children[0]  # type: ignore[union-attr]
+
+    def samlink_body(self, tree: object) -> list[tuple[str, str] | FieldDef]:
+        return list(tree.children)  # type: ignore[union-attr]
+
+    def samlink_decl(self, tree: object) -> SamLinkDecl:
+        children = tree.children  # type: ignore[union-attr]
+        name = children[0]
+        members = children[1]
+        master = ""
+        duplicate = ""
+        fields: list[FieldDef] = []
+        for m in members:
+            if isinstance(m, tuple) and m[0] == "master":
+                master = m[1]
+            elif isinstance(m, tuple) and m[0] == "duplicate":
+                duplicate = m[1]
+            elif isinstance(m, FieldDef):
+                fields.append(m)
+        return SamLinkDecl(
+            name=name, master_ref=master, duplicate_ref=duplicate,
+            fields=fields, loc=self._loc(tree),
+        )
+
+    def path_chain(self, tree: object) -> list[str]:
+        return list(tree.children)  # type: ignore[union-attr]
+
+    def path_decl(self, tree: object) -> list[str]:
+        return tree.children[0]  # type: ignore[union-attr]
+
+    def bridge_member(self, tree: object) -> list[str] | FieldDef:
+        return tree.children[0]  # type: ignore[union-attr]
+
+    def bridge_body(self, tree: object) -> list[list[str] | FieldDef]:
+        return list(tree.children)  # type: ignore[union-attr]
+
+    def bridge_decl(self, tree: object) -> BridgeDecl:
+        children = tree.children  # type: ignore[union-attr]
+        name = children[0]
+        members = children[1]
+        path: list[str] = []
+        fields: list[FieldDef] = []
+        for m in members:
+            if isinstance(m, list):
+                path = m
+            elif isinstance(m, FieldDef):
+                fields.append(m)
+        return BridgeDecl(
+            name=name, path=path, fields=fields, loc=self._loc(tree),
+        )
+
+    def pit_of(self, tree: object) -> tuple[str, str]:
+        return ("of", tree.children[0])  # type: ignore[union-attr]
+
+    def pit_tracks(self, tree: object) -> tuple[str, list[str]]:
+        return ("tracks", list(tree.children))  # type: ignore[union-attr]
+
+    def pit_member(self, tree: object) -> tuple | FieldDef:
+        return tree.children[0]  # type: ignore[union-attr]
+
+    def pit_body(self, tree: object) -> list:
+        return list(tree.children)  # type: ignore[union-attr]
+
+    def pit_decl(self, tree: object) -> PitDecl:
+        children = tree.children  # type: ignore[union-attr]
+        name = children[0]
+        members = children[1]
+        anchor = ""
+        tracked: list[str] = []
+        fields: list[FieldDef] = []
+        for m in members:
+            if isinstance(m, tuple) and m[0] == "of":
+                anchor = m[1]
+            elif isinstance(m, tuple) and m[0] == "tracks":
+                tracked = m[1]
+            elif isinstance(m, FieldDef):
+                fields.append(m)
+        return PitDecl(
+            name=name, anchor_ref=anchor, tracked_satellites=tracked,
+            fields=fields, loc=self._loc(tree),
+        )
+
     def import_decl(self, tree: object) -> ImportDecl:
         return ImportDecl(path=tree.children[0], loc=self._loc(tree))  # type: ignore[union-attr]
 
@@ -298,6 +390,12 @@ class DVMLTransformer(Transformer):  # type: ignore[type-arg]
                 module.nhlinks.append(item)
             elif isinstance(item, EffSatDecl):
                 module.effsats.append(item)
+            elif isinstance(item, SamLinkDecl):
+                module.samlinks.append(item)
+            elif isinstance(item, BridgeDecl):
+                module.bridges.append(item)
+            elif isinstance(item, PitDecl):
+                module.pits.append(item)
         return module
 
 

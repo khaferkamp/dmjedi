@@ -234,3 +234,91 @@ def test_parse_effsat():
     assert len(effsat.fields) == 2
     assert effsat.fields[0].name == "valid_from"
     assert effsat.fields[1].name == "valid_to"
+
+
+# --- Task 2: samlink, bridge, pit ---
+
+
+def test_parse_samlink():
+    """SamLinkDecl: samlink with master/duplicate refs parses into module.samlinks."""
+    source = "samlink CustomerMatch { master Customer  duplicate Customer }"
+    module = parse(source)
+    assert len(module.samlinks) == 1
+    samlink = module.samlinks[0]
+    assert samlink.name == "CustomerMatch"
+    assert samlink.master_ref == "Customer"
+    assert samlink.duplicate_ref == "Customer"
+
+
+def test_parse_samlink_with_fields():
+    """SamLinkDecl: samlink with extra fields — fields accessible."""
+    source = "samlink CustomerMatch { master Customer  duplicate Customer  score : decimal }"
+    module = parse(source)
+    assert len(module.samlinks) == 1
+    samlink = module.samlinks[0]
+    assert len(samlink.fields) == 1
+    assert samlink.fields[0].name == "score"
+
+
+def test_parse_bridge():
+    """BridgeDecl: bridge with 3-node path parses into module.bridges."""
+    source = "bridge CustomerOrder { path Customer -> CustomerOrder -> Order }"
+    module = parse(source)
+    assert len(module.bridges) == 1
+    bridge = module.bridges[0]
+    assert bridge.name == "CustomerOrder"
+    assert bridge.path == ["Customer", "CustomerOrder", "Order"]
+
+
+def test_parse_bridge_long_path():
+    """BridgeDecl: bridge with 4+ nodes — all in path list."""
+    source = "bridge LongPath { path A -> B -> C -> D }"
+    module = parse(source)
+    assert len(module.bridges) == 1
+    assert module.bridges[0].path == ["A", "B", "C", "D"]
+
+
+def test_parse_pit():
+    """PitDecl: pit with of + tracks parses into module.pits."""
+    source = "pit CustomerPIT { of Customer  tracks CustomerDetails, CustomerStatus }"
+    module = parse(source)
+    assert len(module.pits) == 1
+    pit = module.pits[0]
+    assert pit.name == "CustomerPIT"
+    assert pit.anchor_ref == "Customer"
+    assert pit.tracked_satellites == ["CustomerDetails", "CustomerStatus"]
+
+
+def test_parse_pit_single_track():
+    """PitDecl: pit tracking 1 satellite parses correctly."""
+    source = "pit SimplePIT { of Hub  tracks HubSat }"
+    module = parse(source)
+    assert len(module.pits) == 1
+    assert module.pits[0].tracked_satellites == ["HubSat"]
+
+
+def test_parse_all_entity_types():
+    """All 9 entity types parse in a single .dv file without error."""
+    source = """
+    namespace test
+
+    hub Customer { business_key customer_id : int }
+    satellite CustomerDetails of Customer { name : string }
+    link CustomerProduct { references Customer, Product }
+    nhsat CurrentState of Customer { active : boolean }
+    nhlink LatestOrder { references Customer, Product }
+    effsat LinkValidity of CustomerProduct { valid_from : timestamp }
+    samlink CustomerMatch { master Customer  duplicate Customer }
+    bridge CustomerBridge { path Customer -> CustomerProduct -> Product }
+    pit CustomerPIT { of Customer  tracks CustomerDetails }
+    """
+    module = parse(source)
+    assert len(module.hubs) == 1
+    assert len(module.satellites) == 1
+    assert len(module.links) == 1
+    assert len(module.nhsats) == 1
+    assert len(module.nhlinks) == 1
+    assert len(module.effsats) == 1
+    assert len(module.samlinks) == 1
+    assert len(module.bridges) == 1
+    assert len(module.pits) == 1
