@@ -91,6 +91,33 @@ class NhLink(BaseModel):
         return f"{self.namespace}.{self.name}" if self.namespace else self.name
 
 
+class EffSat(BaseModel):
+    """A resolved effectivity satellite (temporal link validity)."""
+
+    name: str
+    namespace: str = ""
+    parent_ref: str
+    columns: list[Column] = []
+
+    @property
+    def qualified_name(self) -> str:
+        return f"{self.namespace}.{self.name}" if self.namespace else self.name
+
+
+class SamLink(BaseModel):
+    """A resolved same-as link (master/duplicate cross-source matching)."""
+
+    name: str
+    namespace: str = ""
+    master_ref: str
+    duplicate_ref: str
+    columns: list[Column] = []
+
+    @property
+    def qualified_name(self) -> str:
+        return f"{self.namespace}.{self.name}" if self.namespace else self.name
+
+
 class DataVaultModel(BaseModel):
     """A complete, resolved Data Vault 2.1 model built from one or more DVML modules."""
 
@@ -99,3 +126,5 @@ class DataVaultModel(BaseModel):
     links: dict[str, Link] = {}
     nhsats: dict[str, NhSat] = {}
     nhlinks: dict[str, NhLink] = {}
+    effsats: dict[str, EffSat] = {}
+    samlinks: dict[str, SamLink] = {}
