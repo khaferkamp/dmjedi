@@ -1,7 +1,18 @@
 """Generator for Databricks Spark Declarative Pipelines (DLT)."""
 
 from dmjedi.generators.base import BaseGenerator, GeneratorResult
-from dmjedi.model.core import Bridge, DataVaultModel, Hub, Link, NhLink, NhSat, Pit, Satellite
+from dmjedi.model.core import (
+    Bridge,
+    DataVaultModel,
+    EffSat,
+    Hub,
+    Link,
+    NhLink,
+    NhSat,
+    Pit,
+    SamLink,
+    Satellite,
+)
 from dmjedi.model.types import map_pyspark_type
 
 _IMPORTS = 'import dlt\nfrom pyspark.sql import functions as F\nfrom pyspark.sql.types import *\n'
@@ -41,6 +52,14 @@ class SparkDeclarativeGenerator(BaseGenerator):
         for pit in model.pits.values():
             result.add_file(
                 f"views/pit_{pit.name}.py", self._generate_pit(pit)
+            )
+        for effsat in model.effsats.values():
+            result.add_file(
+                f"satellites/effsat_{effsat.name}.py", self._generate_effsat(effsat)
+            )
+        for samlink in model.samlinks.values():
+            result.add_file(
+                f"links/samlink_{samlink.name}.py", self._generate_samlink(samlink)
             )
         return result
 
@@ -179,6 +198,50 @@ class SparkDeclarativeGenerator(BaseGenerator):
             f'    target="{table_name}",\n'
             f'    source="src_{nhlink.name}",\n'
             f'    keys=["{nhlink.name}_hk"],\n'
+            f'    sequence_by=F.col("load_ts"),\n'
+            f"    stored_as_scd_type=1,\n"
+            f")\n"
+        )
+
+    def _generate_effsat(self, effsat: EffSat) -> str:
+        table_name = f"effsat_{effsat.name}"
+        # NOTE: No column selection in generated code. dlt.apply_changes() infers
+        # the full schema from the source dataset at runtime.
+        return (
+            f"{_IMPORTS}\n\n"
+            f"@dlt.table(\n"
+            f'    name="{table_name}",\n'
+            f'    comment="EffSat: {effsat.name} (parent: {effsat.parent_ref}) — current-state"\n'
+            f")\n"
+            f"def {table_name}_target():\n"
+            f'    """Schema definition for effectivity satellite {effsat.name}."""\n'
+            f"    pass\n\n"
+            f"dlt.apply_changes(\n"
+            f'    target="{table_name}",\n'
+            f'    source="src_{effsat.name}",\n'
+            f'    keys=["{effsat.parent_ref}_hk"],\n'
+            f'    sequence_by=F.col("load_ts"),\n'
+            f"    stored_as_scd_type=1,\n"
+            f")\n"
+        )
+
+    def _generate_samlink(self, samlink: SamLink) -> str:
+        table_name = f"samlink_{samlink.name}"
+        # NOTE: No column selection in generated code. dlt.apply_changes() infers
+        # the full schema from the source dataset at runtime.
+        return (
+            f"{_IMPORTS}\n\n"
+            f"@dlt.table(\n"
+            f'    name="{table_name}",\n'
+            f'    comment="SamLink: {samlink.name} — current-state"\n'
+            f")\n"
+            f"def {table_name}_target():\n"
+            f'    """Schema definition for same-as link {samlink.name}."""\n'
+            f"    pass\n\n"
+            f"dlt.apply_changes(\n"
+            f'    target="{table_name}",\n'
+            f'    source="src_{samlink.name}",\n'
+            f'    keys=["{samlink.name}_hk"],\n'
             f'    sequence_by=F.col("load_ts"),\n'
             f"    stored_as_scd_type=1,\n"
             f")\n"

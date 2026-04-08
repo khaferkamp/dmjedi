@@ -66,4 +66,16 @@ class SqlJinjaGenerator(BaseGenerator):
                 f"views/pit_{pit.name}.sql", pit_tpl.render(pit=pit)
             )
 
+        effsat_tpl = env.get_template("effsat.sql.j2")
+        for effsat in model.effsats.values():
+            result.add_file(
+                f"satellites/effsat_{effsat.name}.sql", effsat_tpl.render(effsat=effsat)
+            )
+
+        samlink_tpl = env.get_template("samlink.sql.j2")
+        for samlink in model.samlinks.values():
+            result.add_file(
+                f"links/samlink_{samlink.name}.sql", samlink_tpl.render(samlink=samlink)
+            )
+
         return result
