@@ -1,8 +1,10 @@
 """DVML parser — transforms .dv source files into AST nodes using Lark."""
 
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from lark import Lark, Transformer, v_args
+from lark.exceptions import UnexpectedCharacters, UnexpectedEOF, UnexpectedInput, UnexpectedToken
 
 from dmjedi.lang.ast import (
     BusinessKeyDef,
@@ -17,13 +19,70 @@ from dmjedi.lang.ast import (
 
 _GRAMMAR_PATH = Path(__file__).parent / "grammar.lark"
 
+# PARSE-01: Module-level singleton — only one Lark instance is created per process.
+_parser: Lark | None = None
+
 
 def _get_parser() -> Lark:
-    return Lark(
-        _GRAMMAR_PATH.read_text(),
-        parser="earley",
-        propagate_positions=True,
-    )
+    """Return the module-level cached Lark parser singleton."""
+    global _parser
+    if _parser is None:
+        _parser = Lark(
+            _GRAMMAR_PATH.read_text(),
+            parser="earley",
+            propagate_positions=True,
+        )
+    return _parser
+
+
+@dataclass
+class ParseError:
+    """Structured parse error data. Renderer-agnostic per D-05."""
+
+    file: str
+    line: int
+    column: int
+    hint: str
+    source_line: str = field(default="")  # reserved for TUI milestone
+
+
+class DVMLParseError(Exception):
+    """A user-facing parse error with structured location and hint data."""
+
+    def __init__(self, error: ParseError) -> None:
+        self.error = error
+        super().__init__(f"{error.file}:{error.line}:{error.column}: {error.hint}")
+
+
+# D-06: Curated hint catalog mapping expected token sets to friendly messages.
+_HINTS: dict[frozenset[str], str] = {
+    frozenset({"RBRACE", "IDENTIFIER"}): 'expected field declaration or "}" to close block',
+    frozenset({"RBRACE"}): 'expected "}" to close block',
+    frozenset({"COLON"}): 'expected ":" after field name',
+    frozenset({"LBRACE"}): 'expected "{" to open entity body',
+}
+
+
+def _get_hint(err: object) -> str:
+    """Derive a human-readable hint from a Lark exception."""
+    if isinstance(err, UnexpectedToken):
+        expected = frozenset(getattr(err, "expected", set()))
+        if expected in _HINTS:
+            return _HINTS[expected]
+        # Check subset matches for partial catalog hits
+        for catalog_key, hint in _HINTS.items():
+            if catalog_key.issubset(expected):
+                return hint
+        tokens = ", ".join(sorted(expected))
+        return f"expected one of: {tokens}"
+    if isinstance(err, UnexpectedCharacters):
+        char = getattr(err, "char", "?")
+        return f"unexpected character '{char}'"
+    if isinstance(err, UnexpectedEOF):
+        expected = getattr(err, "expected", [])
+        tokens = ", ".join(sorted(expected))
+        return f"unexpected end of file, expected one of: {tokens}"
+    return str(err)
 
 
 @v_args(tree=True)
@@ -52,8 +111,16 @@ class DVMLTransformer(Transformer):  # type: ignore[type-arg]
         return ".".join(tree.children)  # type: ignore[union-attr]
 
     def data_type(self, tree: object) -> str:
-        child = tree.children[0]  # type: ignore[union-attr]
-        return child.data if hasattr(child, "data") else str(child)
+        children = tree.children  # type: ignore[union-attr]
+        type_name = children[0]  # str from type_name alias method
+        if len(children) > 1:
+            params = str(children[1])  # type_params token
+            return f"{type_name}({params})"
+        return str(type_name)
+
+    def type_params(self, tree: object) -> str:
+        children = tree.children  # type: ignore[union-attr]
+        return str(children[0]) if children else ""
 
     def type_int(self, tree: object) -> str:
         return "int"
@@ -75,6 +142,23 @@ class DVMLTransformer(Transformer):  # type: ignore[type-arg]
 
     def type_json(self, tree: object) -> str:
         return "json"
+
+    def type_bigint(self, tree: object) -> str:
+        return "bigint"
+
+    def type_float(self, tree: object) -> str:
+        return "float"
+
+    def type_varchar(self, tree: object) -> str:
+        return "varchar"
+
+    def type_binary(self, tree: object) -> str:
+        return "binary"
+
+    def type_name(self, tree: object) -> str:
+        # type_name is an alias rule — its child is already a string from the alias method
+        children = tree.children  # type: ignore[union-attr]
+        return str(children[0])
 
     def field_decl(self, tree: object) -> FieldDef:
         children = tree.children  # type: ignore[union-attr]
@@ -166,7 +250,15 @@ class DVMLTransformer(Transformer):  # type: ignore[type-arg]
 def parse(source: str, source_file: str = "<string>") -> DVMLModule:
     """Parse DVML source text and return an AST module."""
     parser = _get_parser()
-    tree = parser.parse(source)
+    try:
+        tree = parser.parse(source)
+    except UnexpectedInput as err:
+        line = max(0, getattr(err, "line", 0))
+        col = max(0, getattr(err, "column", 0))
+        hint = _get_hint(err)
+        raise DVMLParseError(ParseError(
+            file=source_file, line=line, column=col, hint=hint
+        )) from err
     transformer = DVMLTransformer(source_file=source_file)
     return transformer.transform(tree)
 

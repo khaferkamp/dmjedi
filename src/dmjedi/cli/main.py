@@ -5,10 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
-from lark.exceptions import UnexpectedInput
 from rich.console import Console
 
 from dmjedi.cli.errors import format_parse_error, print_diagnostics
+from dmjedi.lang.parser import DVMLParseError
 from dmjedi.docs.markdown import generate_markdown
 from dmjedi.generators import registry
 from dmjedi.lang.ast import DVMLModule
@@ -161,8 +161,8 @@ def _parse_all(paths: list[Path], console: Console) -> list[DVMLModule]:
     for path in dv_files:
         try:
             modules.append(parse_file(path))
-        except UnexpectedInput as e:
-            console.print(format_parse_error(e, str(path)))
+        except DVMLParseError as e:
+            console.print(format_parse_error(e))
             raise typer.Exit(code=1) from None
 
     # Step 3: Resolve imports

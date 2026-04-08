@@ -58,13 +58,21 @@ references_decl: "references" qualified_ref ("," qualified_ref)*
 // --- Shared ---
 field_decl: IDENTIFIER ":" data_type
 
-data_type: "int"       -> type_int
+data_type: type_name ("(" type_params ")")?
+
+type_name: "int"       -> type_int
          | "string"    -> type_string
          | "decimal"   -> type_decimal
          | "date"      -> type_date
          | "timestamp" -> type_timestamp
          | "boolean"   -> type_boolean
          | "json"      -> type_json
+         | "bigint"    -> type_bigint
+         | "float"     -> type_float
+         | "varchar"   -> type_varchar
+         | "binary"    -> type_binary
+
+type_params: /[^)]+/
 
 qualified_ref: IDENTIFIER ("." IDENTIFIER)*
 

@@ -43,7 +43,7 @@ def test_validate_syntax_error(tmp_path: Path) -> None:
     bad_dv.write_text("this is not valid dvml !!!")
     result = runner.invoke(app, ["validate", str(bad_dv)])
     assert result.exit_code == 1
-    assert "Syntax error" in result.output
+    assert "error:" in result.output
 
 
 # --- generate command ---
@@ -119,17 +119,14 @@ def test_format_lint_diagnostic_warning() -> None:
 
 
 def test_format_parse_error() -> None:
-    from dmjedi.lang.parser import parse
+    from dmjedi.lang.parser import DVMLParseError, parse
 
     try:
-        parse("this is not valid dvml !!!")
-    except Exception as err:
-        from lark.exceptions import UnexpectedInput
-
-        assert isinstance(err, UnexpectedInput)
-        formatted = format_parse_error(err, "bad.dv")
+        parse("this is not valid dvml !!!", source_file="bad.dv")
+    except DVMLParseError as err:
+        formatted = format_parse_error(err)
         assert "bad.dv:" in formatted
-        assert "Syntax error" in formatted
+        assert "error:" in formatted
 
 
 # --- directory and import integration ---
