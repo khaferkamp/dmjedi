@@ -388,3 +388,206 @@ def test_data_vault_model_has_bridges_pits():
     )
     assert "test.B" in model.bridges
     assert "test.P" in model.pits
+
+
+# --- Resolver tests for bridge ---
+
+
+def test_resolve_bridge():
+    """Parsed bridge declaration appears in model.bridges with correct path."""
+    src = (
+        "namespace test\n"
+        "hub Customer { business_key customer_id : int }\n"
+        "hub Product { business_key product_id : int }\n"
+        "link CustomerProduct { references Customer, Product }\n"
+        "bridge CustProd {\n"
+        "    path Customer -> CustomerProduct -> Product\n"
+        "}"
+    )
+    module = parse(src)
+    model = resolve([module])
+    assert "test.CustProd" in model.bridges
+    bridge = model.bridges["test.CustProd"]
+    assert bridge.path == ["Customer", "CustomerProduct", "Product"]
+
+
+def test_duplicate_bridge_raises():
+    """Duplicate bridge qualified name raises ResolverErrors."""
+    src = (
+        "namespace test\n"
+        "hub Customer { business_key customer_id : int }\n"
+        "hub Product { business_key product_id : int }\n"
+        "link CustomerProduct { references Customer, Product }\n"
+        "bridge CustProd {\n"
+        "    path Customer -> CustomerProduct -> Product\n"
+        "}"
+    )
+    mod1 = parse(src)
+    mod2 = parse(src)
+    with pytest.raises(ResolverErrors, match="Duplicate bridge"):
+        resolve([mod1, mod2])
+
+
+def test_bridge_path_too_short_raises():
+    """Bridge with path fewer than 3 elements raises ResolverErrors matching 'at least 3 elements'."""
+    from dmjedi.lang.ast import BridgeDecl, HubDecl, LinkDecl, DVMLModule
+
+    hub_c = HubDecl(name="Customer", business_keys=[])
+    hub_p = HubDecl(name="Product", business_keys=[])
+    link_cp = LinkDecl(name="CustomerProduct", references=["Customer", "Product"])
+    bridge_decl = BridgeDecl(name="Short", path=["Customer", "CustomerProduct"])
+    module = DVMLModule(
+        namespace="test",
+        hubs=[hub_c, hub_p],
+        links=[link_cp],
+        bridges=[bridge_decl],
+    )
+    with pytest.raises(ResolverErrors, match="at least 3 elements"):
+        resolve([module])
+
+
+def test_bridge_path_hub_at_odd_position_raises():
+    """Bridge path with hub at odd position (where link expected) raises ResolverErrors matching 'must be a link'."""
+    src = (
+        "namespace test\n"
+        "hub Customer { business_key customer_id : int }\n"
+        "hub Product { business_key product_id : int }\n"
+        "hub CustomerProduct { business_key id : int }\n"
+        "link CustomerLink { references Customer, Product }\n"
+        "bridge CustProd {\n"
+        "    path Customer -> Product -> CustomerProduct\n"
+        "}"
+    )
+    module = parse(src)
+    with pytest.raises(ResolverErrors, match="must be a link"):
+        resolve([module])
+
+
+def test_bridge_path_link_at_even_position_raises():
+    """Bridge path starting with a link at position 0 raises ResolverErrors matching 'must be a hub'."""
+    from dmjedi.lang.ast import BridgeDecl, HubDecl, LinkDecl, DVMLModule
+
+    hub_c = HubDecl(name="Customer", business_keys=[])
+    hub_p = HubDecl(name="Product", business_keys=[])
+    link_cp = LinkDecl(name="CustomerProduct", references=["Customer", "Product"])
+    # path starts with the link, not a hub
+    bridge_decl = BridgeDecl(name="BadBridge", path=["CustomerProduct", "Customer", "Product"])
+    module = DVMLModule(
+        namespace="test",
+        hubs=[hub_c, hub_p],
+        links=[link_cp],
+        bridges=[bridge_decl],
+    )
+    with pytest.raises(ResolverErrors, match="must be a hub"):
+        resolve([module])
+
+
+def test_bridge_path_unknown_ref_raises():
+    """Bridge path referencing unknown entity raises ResolverErrors."""
+    from dmjedi.lang.ast import BridgeDecl, HubDecl, LinkDecl, DVMLModule
+
+    hub_c = HubDecl(name="Customer", business_keys=[])
+    hub_p = HubDecl(name="Product", business_keys=[])
+    link_cp = LinkDecl(name="CustomerProduct", references=["Customer", "Product"])
+    bridge_decl = BridgeDecl(name="BadBridge", path=["Customer", "NonExistent", "Product"])
+    module = DVMLModule(
+        namespace="test",
+        hubs=[hub_c, hub_p],
+        links=[link_cp],
+        bridges=[bridge_decl],
+    )
+    with pytest.raises(ResolverErrors, match="must be a hub|must be a link"):
+        resolve([module])
+
+
+# --- Resolver tests for pit ---
+
+
+def test_resolve_pit():
+    """Parsed pit declaration appears in model.pits with correct anchor_ref and tracked_satellites."""
+    src = (
+        "namespace test\n"
+        "hub Customer { business_key customer_id : int }\n"
+        "satellite CustomerDetails of Customer { first_name : string }\n"
+        "pit CustPit {\n"
+        "    of Customer\n"
+        "    tracks CustomerDetails\n"
+        "}"
+    )
+    module = parse(src)
+    model = resolve([module])
+    assert "test.CustPit" in model.pits
+    pit = model.pits["test.CustPit"]
+    assert pit.anchor_ref == "Customer"
+    assert pit.tracked_satellites == ["CustomerDetails"]
+
+
+def test_duplicate_pit_raises():
+    """Duplicate pit qualified name raises ResolverErrors."""
+    src = (
+        "namespace test\n"
+        "hub Customer { business_key customer_id : int }\n"
+        "satellite CustomerDetails of Customer { first_name : string }\n"
+        "pit CustPit {\n"
+        "    of Customer\n"
+        "    tracks CustomerDetails\n"
+        "}"
+    )
+    mod1 = parse(src)
+    mod2 = parse(src)
+    with pytest.raises(ResolverErrors, match="Duplicate pit"):
+        resolve([mod1, mod2])
+
+
+def test_pit_satellite_not_owned_by_anchor_raises():
+    """PIT tracking satellite whose parent_ref differs from anchor raises ResolverErrors matching 'does not belong'."""
+    src = (
+        "namespace test\n"
+        "hub Customer { business_key customer_id : int }\n"
+        "hub Product { business_key product_id : int }\n"
+        "satellite ProductDetails of Product { detail : string }\n"
+        "pit CustPit {\n"
+        "    of Customer\n"
+        "    tracks ProductDetails\n"
+        "}"
+    )
+    module = parse(src)
+    with pytest.raises(ResolverErrors, match="does not belong"):
+        resolve([module])
+
+
+def test_pit_unknown_satellite_raises():
+    """PIT tracking unknown satellite raises ResolverErrors matching 'unknown satellite'."""
+    src = (
+        "namespace test\n"
+        "hub Customer { business_key customer_id : int }\n"
+        "pit CustPit {\n"
+        "    of Customer\n"
+        "    tracks NonExistent\n"
+        "}"
+    )
+    module = parse(src)
+    with pytest.raises(ResolverErrors, match="unknown satellite"):
+        resolve([module])
+
+
+def test_bridge_and_pit_integration():
+    """Valid bridge and pit in same module both resolve successfully."""
+    src = (
+        "namespace test\n"
+        "hub Customer { business_key customer_id : int }\n"
+        "hub Product { business_key product_id : int }\n"
+        "satellite CustomerDetails of Customer { name : string }\n"
+        "link CustomerProduct { references Customer, Product }\n"
+        "bridge CustProd {\n"
+        "    path Customer -> CustomerProduct -> Product\n"
+        "}\n"
+        "pit CustPit {\n"
+        "    of Customer\n"
+        "    tracks CustomerDetails\n"
+        "}"
+    )
+    module = parse(src)
+    model = resolve([module])
+    assert len(model.bridges) == 1
+    assert len(model.pits) == 1

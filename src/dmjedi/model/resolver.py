@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from dmjedi.lang.ast import DVMLModule
 from dmjedi.model.core import (
+    Bridge,
     Column,
     DataVaultModel,
     EffSat,
@@ -11,6 +12,7 @@ from dmjedi.model.core import (
     Link,
     NhLink,
     NhSat,
+    Pit,
     SamLink,
     Satellite,
 )
@@ -227,6 +229,49 @@ def resolve(modules: list[DVMLModule]) -> DataVaultModel:
             else:
                 model.samlinks[qname] = samlink
 
+        for bridge_decl in module.bridges:
+            bridge = Bridge(
+                name=bridge_decl.name,
+                namespace=ns,
+                path=bridge_decl.path,
+            )
+            qname = bridge.qualified_name
+            if qname in model.bridges:
+                errors.append(
+                    ResolverError(
+                        message=(
+                            f"Duplicate bridge '{qname}' redefined"
+                            f" in {module.source_file or '<string>'}:{bridge_decl.loc.line}"
+                        ),
+                        source_file=module.source_file,
+                        line=bridge_decl.loc.line,
+                    )
+                )
+            else:
+                model.bridges[qname] = bridge
+
+        for pit_decl in module.pits:
+            pit = Pit(
+                name=pit_decl.name,
+                namespace=ns,
+                anchor_ref=pit_decl.anchor_ref,
+                tracked_satellites=pit_decl.tracked_satellites,
+            )
+            qname = pit.qualified_name
+            if qname in model.pits:
+                errors.append(
+                    ResolverError(
+                        message=(
+                            f"Duplicate pit '{qname}' redefined"
+                            f" in {module.source_file or '<string>'}:{pit_decl.loc.line}"
+                        ),
+                        source_file=module.source_file,
+                        line=pit_decl.loc.line,
+                    )
+                )
+            else:
+                model.pits[qname] = pit
+
     # Post-resolution validation: satellite parent refs
     for sat in model.satellites.values():
         ref = sat.parent_ref
@@ -283,6 +328,68 @@ def resolve(modules: list[DVMLModule]) -> DataVaultModel:
                     ),
                 )
             )
+
+    # Post-resolution validation: bridge path chain (LINT-04)
+    for bridge in model.bridges.values():
+        path = bridge.path
+        if len(path) < 3:
+            errors.append(
+                ResolverError(
+                    message=(
+                        f"Bridge '{bridge.qualified_name}' path must have"
+                        f" at least 3 elements (Hub -> Link -> Hub)"
+                    ),
+                )
+            )
+            continue
+        for i, ref in enumerate(path):
+            ns_ref = f"{bridge.namespace}.{ref}" if bridge.namespace else ref
+            if i % 2 == 0:  # even positions: must be a hub
+                if ref not in model.hubs and ns_ref not in model.hubs:
+                    errors.append(
+                        ResolverError(
+                            message=(
+                                f"Bridge '{bridge.qualified_name}' path position"
+                                f" {i} ('{ref}') must be a hub"
+                            ),
+                        )
+                    )
+            else:  # odd positions: must be a link
+                if ref not in model.links and ns_ref not in model.links:
+                    errors.append(
+                        ResolverError(
+                            message=(
+                                f"Bridge '{bridge.qualified_name}' path position"
+                                f" {i} ('{ref}') must be a link"
+                            ),
+                        )
+                    )
+
+    # Post-resolution validation: PIT satellite ownership (LINT-05)
+    for pit in model.pits.values():
+        anchor = pit.anchor_ref
+        ns_anchor = f"{pit.namespace}.{anchor}" if pit.namespace else anchor
+        for sat_ref in pit.tracked_satellites:
+            ns_sat_ref = f"{pit.namespace}.{sat_ref}" if pit.namespace else sat_ref
+            sat_or_none = model.satellites.get(sat_ref) or model.satellites.get(ns_sat_ref)
+            if sat_or_none is None:
+                errors.append(
+                    ResolverError(
+                        message=(
+                            f"PIT '{pit.qualified_name}' tracks"
+                            f" unknown satellite '{sat_ref}'"
+                        ),
+                    )
+                )
+            elif sat_or_none.parent_ref != anchor and sat_or_none.parent_ref != ns_anchor:
+                errors.append(
+                    ResolverError(
+                        message=(
+                            f"PIT '{pit.qualified_name}' satellite '{sat_ref}'"
+                            f" does not belong to anchor hub '{anchor}'"
+                        ),
+                    )
+                )
 
     if errors:
         raise ResolverErrors(errors)

@@ -1,0 +1,27 @@
+namespace sales
+
+hub Customer {
+    business_key customer_id : int
+}
+
+hub Product {
+    business_key product_id : int
+}
+
+satellite CustomerDetails of Customer {
+    first_name : string
+    last_name : string
+}
+
+link CustomerProduct {
+    references Customer, Product
+}
+
+bridge CustomerProductBridge {
+    path Customer -> CustomerProduct -> Product
+}
+
+pit CustomerPit {
+    of Customer
+    tracks CustomerDetails
+}
