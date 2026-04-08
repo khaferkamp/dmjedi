@@ -1,7 +1,7 @@
 """Generator for Databricks Spark Declarative Pipelines (DLT)."""
 
 from dmjedi.generators.base import BaseGenerator, GeneratorResult
-from dmjedi.model.core import DataVaultModel, Hub, Link, Satellite
+from dmjedi.model.core import DataVaultModel, Hub, Link, NhLink, NhSat, Satellite
 from dmjedi.model.types import map_pyspark_type
 
 _IMPORTS = 'import dlt\nfrom pyspark.sql import functions as F\nfrom pyspark.sql.types import *\n'
@@ -20,6 +20,14 @@ class SparkDeclarativeGenerator(BaseGenerator):
             result.add_file(f"satellites/{sat.name}.py", self._generate_satellite(sat))
         for link in model.links.values():
             result.add_file(f"links/{link.name}.py", self._generate_link(link))
+        for nhsat in model.nhsats.values():
+            result.add_file(
+                f"satellites/nhsat_{nhsat.name}.py", self._generate_nhsat(nhsat)
+            )
+        for nhlink in model.nhlinks.values():
+            result.add_file(
+                f"links/nhlink_{nhlink.name}.py", self._generate_nhlink(nhlink)
+            )
         return result
 
     def _generate_hub(self, hub: Hub) -> str:
@@ -112,4 +120,52 @@ class SparkDeclarativeGenerator(BaseGenerator):
             f"{ref_selects}"
             f"{col_selects}"
             f"    )\n"
+        )
+
+    def _generate_nhsat(self, nhsat: NhSat) -> str:
+        table_name = f"nhsat_{nhsat.name}"
+        # NOTE: No column selection in generated code. dlt.apply_changes() infers
+        # the full schema from the source dataset at runtime. User-defined columns
+        # are validated at the model layer but do not appear in DLT output.
+
+        return (
+            f"{_IMPORTS}\n\n"
+            f"@dlt.table(\n"
+            f'    name="{table_name}",\n'
+            f'    comment="NhSat: {nhsat.name} (parent: {nhsat.parent_ref}) — current-state"\n'
+            f")\n"
+            f"def {table_name}_target():\n"
+            f'    """Schema definition for non-historized satellite {nhsat.name}."""\n'
+            f"    pass\n\n"
+            f"dlt.apply_changes(\n"
+            f'    target="{table_name}",\n'
+            f'    source="src_{nhsat.name}",\n'
+            f'    keys=["{nhsat.parent_ref}_hk"],\n'
+            f'    sequence_by=F.col("load_ts"),\n'
+            f"    stored_as_scd_type=1,\n"
+            f")\n"
+        )
+
+    def _generate_nhlink(self, nhlink: NhLink) -> str:
+        table_name = f"nhlink_{nhlink.name}"
+        # NOTE: No column selection or hub-ref column lists in generated code.
+        # dlt.apply_changes() infers the full schema from the source dataset at
+        # runtime. The only explicit key is the link hash key used for MERGE matching.
+
+        return (
+            f"{_IMPORTS}\n\n"
+            f"@dlt.table(\n"
+            f'    name="{table_name}",\n'
+            f'    comment="NhLink: {nhlink.name} — current-state"\n'
+            f")\n"
+            f"def {table_name}_target():\n"
+            f'    """Schema definition for non-historized link {nhlink.name}."""\n'
+            f"    pass\n\n"
+            f"dlt.apply_changes(\n"
+            f'    target="{table_name}",\n'
+            f'    source="src_{nhlink.name}",\n'
+            f'    keys=["{nhlink.name}_hk"],\n'
+            f'    sequence_by=F.col("load_ts"),\n'
+            f"    stored_as_scd_type=1,\n"
+            f")\n"
         )
