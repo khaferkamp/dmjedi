@@ -239,3 +239,111 @@ def test_data_vault_model_has_effsats_samlinks():
     )
     assert "n.E" in model.effsats
     assert "n.S" in model.samlinks
+
+
+# --- Resolver tests for effsat / samlink ---
+
+
+def test_resolve_effsat():
+    """Parsed effsat declaration resolves into model.effsats with correct fields."""
+    src = (
+        "namespace test\n"
+        "hub Customer { business_key id : int }\n"
+        "hub Product { business_key id : int }\n"
+        "link CustomerOrder { references Customer, Product }\n"
+        "effsat OrderValidity of CustomerOrder {\n"
+        "    start_date : timestamp\n"
+        "    end_date : timestamp\n"
+        "}"
+    )
+    module = parse(src)
+    model = resolve([module])
+    assert "test.OrderValidity" in model.effsats
+    effsat = model.effsats["test.OrderValidity"]
+    assert effsat.parent_ref == "CustomerOrder"
+    assert len(effsat.columns) == 2
+    assert effsat.columns[0].name == "start_date"
+    assert effsat.columns[1].name == "end_date"
+
+
+def test_resolve_samlink():
+    """Parsed samlink declaration resolves into model.samlinks with correct fields."""
+    src = (
+        "namespace test\n"
+        "hub Customer { business_key id : int }\n"
+        "samlink CustomerMatch {\n"
+        "    master Customer\n"
+        "    duplicate Customer\n"
+        "    confidence_score : decimal\n"
+        "}"
+    )
+    module = parse(src)
+    model = resolve([module])
+    assert "test.CustomerMatch" in model.samlinks
+    samlink = model.samlinks["test.CustomerMatch"]
+    assert samlink.master_ref == "Customer"
+    assert samlink.duplicate_ref == "Customer"
+
+
+def test_duplicate_effsat_raises():
+    """Duplicate effsat qualified name raises ResolverErrors."""
+    src = (
+        "namespace test\n"
+        "hub Customer { business_key id : int }\n"
+        "hub Product { business_key id : int }\n"
+        "link CustomerOrder { references Customer, Product }\n"
+        "effsat OrderValidity of CustomerOrder { start_date : timestamp }"
+    )
+    mod1 = parse(src)
+    mod2 = parse(src)
+    with pytest.raises(ResolverErrors, match="Duplicate effsat"):
+        resolve([mod1, mod2])
+
+
+def test_duplicate_samlink_raises():
+    """Duplicate samlink qualified name raises ResolverErrors."""
+    src = (
+        "namespace test\n"
+        "hub Customer { business_key id : int }\n"
+        "samlink CustomerMatch {\n"
+        "    master Customer\n"
+        "    duplicate Customer\n"
+        "}"
+    )
+    mod1 = parse(src)
+    mod2 = parse(src)
+    with pytest.raises(ResolverErrors, match="Duplicate samlink"):
+        resolve([mod1, mod2])
+
+
+def test_effsat_invalid_parent_raises():
+    """EffSat referencing unknown parent raises ResolverErrors."""
+    src = (
+        "namespace test\n"
+        "effsat BadValidity of NonExistent { start_date : timestamp }"
+    )
+    module = parse(src)
+    with pytest.raises(ResolverErrors, match="unknown parent"):
+        resolve([module])
+
+
+def test_effsat_parent_ref_to_hub_resolves():
+    """EffSat of a hub (not link) resolves without error — type check is linter's job."""
+    src = (
+        "namespace test\n"
+        "hub Customer { business_key id : int }\n"
+        "effsat CustomerValidity of Customer { active : boolean }"
+    )
+    module = parse(src)
+    model = resolve([module])
+    assert "test.CustomerValidity" in model.effsats
+
+
+def test_samlink_empty_ref_raises():
+    """SamLink with empty master_ref raises ResolverErrors."""
+    from dmjedi.lang.ast import SamLinkDecl, DVMLModule
+
+    decl = SamLinkDecl(name="BadSamLink", master_ref="", duplicate_ref="Customer")
+    module = DVMLModule(namespace="test", samlinks=[decl])
+    with pytest.raises(ResolverErrors, match="missing master"):
+        resolve([module])
