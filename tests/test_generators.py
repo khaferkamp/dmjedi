@@ -3,7 +3,7 @@
 from dmjedi.generators import registry
 from dmjedi.generators.sql_jinja.generator import SqlJinjaGenerator
 from dmjedi.generators.sql_jinja.types import map_type
-from dmjedi.model.core import Column, DataVaultModel, Hub, Link, Satellite
+from dmjedi.model.core import Column, DataVaultModel, Hub, Link, NhLink, NhSat, Satellite
 
 
 def _sample_model() -> DataVaultModel:
@@ -279,3 +279,164 @@ def test_spark_satellite_column_type_mapping():
     sat_code = result.files["satellites/TestSat.py"]
     assert "LongType()" in sat_code, "bigint column should map to LongType() in Spark output"
     assert ".cast(" in sat_code, "typed columns should use .cast() in Spark output"
+
+
+# --- Non-historized entity helpers ---
+
+
+def _sample_model_with_nh() -> DataVaultModel:
+    """DataVaultModel including nhsat and nhlink entities for generator tests."""
+    return DataVaultModel(
+        hubs={
+            "sales.Customer": Hub(
+                name="Customer",
+                namespace="sales",
+                business_keys=[Column(name="customer_id", data_type="int", is_business_key=True)],
+            )
+        },
+        satellites={
+            "sales.CustomerDetails": Satellite(
+                name="CustomerDetails",
+                namespace="sales",
+                parent_ref="Customer",
+                columns=[Column(name="first_name", data_type="string")],
+            )
+        },
+        links={
+            "sales.CustomerProduct": Link(
+                name="CustomerProduct",
+                namespace="sales",
+                hub_references=["Customer", "Product"],
+            )
+        },
+        nhsats={
+            "sales.CurrentStatus": NhSat(
+                name="CurrentStatus",
+                namespace="sales",
+                parent_ref="Customer",
+                columns=[Column(name="status", data_type="string")],
+            )
+        },
+        nhlinks={
+            "sales.AB": NhLink(
+                name="AB",
+                namespace="sales",
+                hub_references=["A", "B"],
+                columns=[Column(name="amount", data_type="decimal")],
+            )
+        },
+    )
+
+
+# --- SQL Jinja non-historized tests ---
+
+
+def test_sql_nhsat_output_valid():
+    """NhSat SQL uses MERGE INTO, includes parent hk, no historized fields, passes SQL validation."""
+    gen = registry.get("sql-jinja")
+    result = gen.generate(_sample_model_with_nh())
+    assert "satellites/nhsat_CurrentStatus.sql" in result.files
+    sql = result.files["satellites/nhsat_CurrentStatus.sql"]
+    _assert_valid_sql(sql)
+    assert "MERGE INTO" in sql
+    assert "Customer_hk" in sql
+    assert "hash_diff" not in sql
+    assert "load_end_ts" not in sql
+    assert "status" in sql
+
+
+def test_sql_nhlink_output_valid():
+    """NhLink SQL uses MERGE INTO, includes link hk and hub ref hks, passes SQL validation."""
+    gen = registry.get("sql-jinja")
+    result = gen.generate(_sample_model_with_nh())
+    assert "links/nhlink_AB.sql" in result.files
+    sql = result.files["links/nhlink_AB.sql"]
+    _assert_valid_sql(sql)
+    assert "MERGE INTO" in sql
+    assert "AB_hk" in sql
+    assert "A_hk" in sql
+    assert "B_hk" in sql
+    assert "amount" in sql
+
+
+def test_sql_nhsat_no_columns_valid():
+    """NhSat with no user columns: no trailing comma bug."""
+    model = DataVaultModel(
+        nhsats={
+            "s.EmptyNhSat": NhSat(
+                name="EmptyNhSat", namespace="s", parent_ref="Parent", columns=[]
+            )
+        },
+    )
+    gen = registry.get("sql-jinja")
+    result = gen.generate(model)
+    assert "satellites/nhsat_EmptyNhSat.sql" in result.files
+    sql = result.files["satellites/nhsat_EmptyNhSat.sql"]
+    _assert_valid_sql(sql)
+    assert "MERGE INTO" in sql
+
+
+def test_sql_nhlink_no_columns_valid():
+    """NhLink with no extra columns: no trailing comma bug."""
+    model = DataVaultModel(
+        nhlinks={
+            "s.XY": NhLink(name="XY", namespace="s", hub_references=["X", "Y"], columns=[])
+        },
+    )
+    gen = registry.get("sql-jinja")
+    result = gen.generate(model)
+    assert "links/nhlink_XY.sql" in result.files
+    sql = result.files["links/nhlink_XY.sql"]
+    _assert_valid_sql(sql)
+    assert "MERGE INTO" in sql
+
+
+# --- Spark DLT non-historized tests ---
+
+
+def test_spark_nhsat_output_functional():
+    """NhSat Spark code uses dlt.apply_changes with stored_as_scd_type=1, no historized fields."""
+    gen = registry.get("spark-declarative")
+    result = gen.generate(_sample_model_with_nh())
+    assert "satellites/nhsat_CurrentStatus.py" in result.files
+    code = result.files["satellites/nhsat_CurrentStatus.py"]
+    assert "import dlt" in code
+    assert "apply_changes" in code
+    assert "stored_as_scd_type=1" in code
+    assert "Customer_hk" in code
+    assert "hash_diff" not in code
+    assert "nhsat_CurrentStatus" in code
+    # apply_changes infers schema at runtime — column names must NOT appear
+    assert "status" not in code
+
+
+def test_spark_nhlink_output_functional():
+    """NhLink Spark code uses dlt.apply_changes with stored_as_scd_type=1."""
+    gen = registry.get("spark-declarative")
+    result = gen.generate(_sample_model_with_nh())
+    assert "links/nhlink_AB.py" in result.files
+    code = result.files["links/nhlink_AB.py"]
+    assert "import dlt" in code
+    assert "apply_changes" in code
+    assert "stored_as_scd_type=1" in code
+    assert "AB_hk" in code
+    assert "nhlink_AB" in code
+    # apply_changes infers schema at runtime — column names must NOT appear
+    assert "amount" not in code
+
+
+def test_spark_nhsat_no_columns():
+    """NhSat with empty columns still generates valid apply_changes code."""
+    model = DataVaultModel(
+        nhsats={
+            "s.EmptyNhSat": NhSat(
+                name="EmptyNhSat", namespace="s", parent_ref="Parent", columns=[]
+            )
+        },
+    )
+    gen = registry.get("spark-declarative")
+    result = gen.generate(model)
+    assert "satellites/nhsat_EmptyNhSat.py" in result.files
+    code = result.files["satellites/nhsat_EmptyNhSat.py"]
+    assert "apply_changes" in code
+    assert "stored_as_scd_type=1" in code
