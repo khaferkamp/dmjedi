@@ -204,8 +204,9 @@ def docs(
 @app.command()
 def lsp() -> None:
     """Start the DVML Language Server."""
-    typer.echo("Starting DVML Language Server...")
-    # TODO: launch pygls server
+    console = Console(stderr=True)
+    console.print("[red]Error:[/red] LSP server is not yet implemented.")
+    raise typer.Exit(code=1)
 
 
 def _parse_all(paths: list[Path], console: Console) -> list[DVMLModule]:
