@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 from dmjedi.lang.ast import DVMLModule
-from dmjedi.model.core import Column, DataVaultModel, Hub, Link, Satellite
+from dmjedi.model.core import Column, DataVaultModel, Hub, Link, NhLink, NhSat, Satellite
 
 
 @dataclass
@@ -107,6 +107,54 @@ def resolve(modules: list[DVMLModule]) -> DataVaultModel:
             else:
                 model.links[qname] = link
 
+        for nhsat_decl in module.nhsats:
+            nhsat = NhSat(
+                name=nhsat_decl.name,
+                namespace=ns,
+                parent_ref=nhsat_decl.parent_ref,
+                columns=[
+                    Column(name=f.name, data_type=f.data_type) for f in nhsat_decl.fields
+                ],
+            )
+            qname = nhsat.qualified_name
+            if qname in model.nhsats:
+                errors.append(
+                    ResolverError(
+                        message=(
+                            f"Duplicate nhsat '{qname}' redefined"
+                            f" in {module.source_file or '<string>'}:{nhsat_decl.loc.line}"
+                        ),
+                        source_file=module.source_file,
+                        line=nhsat_decl.loc.line,
+                    )
+                )
+            else:
+                model.nhsats[qname] = nhsat
+
+        for nhlink_decl in module.nhlinks:
+            nhlink = NhLink(
+                name=nhlink_decl.name,
+                namespace=ns,
+                hub_references=nhlink_decl.references,
+                columns=[
+                    Column(name=f.name, data_type=f.data_type) for f in nhlink_decl.fields
+                ],
+            )
+            qname = nhlink.qualified_name
+            if qname in model.nhlinks:
+                errors.append(
+                    ResolverError(
+                        message=(
+                            f"Duplicate nhlink '{qname}' redefined"
+                            f" in {module.source_file or '<string>'}:{nhlink_decl.loc.line}"
+                        ),
+                        source_file=module.source_file,
+                        line=nhlink_decl.loc.line,
+                    )
+                )
+            else:
+                model.nhlinks[qname] = nhlink
+
     # Post-resolution validation: satellite parent refs
     for sat in model.satellites.values():
         ref = sat.parent_ref
@@ -121,6 +169,25 @@ def resolve(modules: list[DVMLModule]) -> DataVaultModel:
                 ResolverError(
                     message=(
                         f"Satellite '{sat.qualified_name}'"
+                        f" references unknown parent '{ref}'"
+                    ),
+                )
+            )
+
+    # Post-resolution validation: nhsat parent refs
+    for nhsat in model.nhsats.values():
+        ref = nhsat.parent_ref
+        ns_ref = f"{nhsat.namespace}.{ref}" if nhsat.namespace else ref
+        if (
+            ref not in model.hubs
+            and ref not in model.links
+            and ns_ref not in model.hubs
+            and ns_ref not in model.links
+        ):
+            errors.append(
+                ResolverError(
+                    message=(
+                        f"NhSat '{nhsat.qualified_name}'"
                         f" references unknown parent '{ref}'"
                     ),
                 )
