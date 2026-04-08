@@ -174,6 +174,8 @@ def _check_naming(
         ("nhlink", module.nhlinks),
         ("effsat", module.effsats),
         ("samlink", module.samlinks),
+        ("bridge", module.bridges),
+        ("pit", module.pits),
     ]
     for entity_type, entities in checks:
         prefix = config.get(entity_type)

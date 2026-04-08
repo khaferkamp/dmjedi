@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from dmjedi.lang.ast import (
+    BridgeDecl,
     BusinessKeyDef,
     DVMLModule,
     EffSatDecl,
@@ -13,6 +14,7 @@ from dmjedi.lang.ast import (
     LinkDecl,
     NhLinkDecl,
     NhSatDecl,
+    PitDecl,
     SamLinkDecl,
     SatelliteDecl,
 )
@@ -251,3 +253,86 @@ def test_naming_all_seven_types(tmp_path: Path) -> None:
     )
     diags = [d for d in lint(module, config_path=toml_file) if d.rule == "naming-convention"]
     assert len(diags) == 7
+
+
+def test_naming_all_nine_types(tmp_path: Path) -> None:
+    """Naming check applies to all 9 entity types, producing one warning each."""
+    toml_file = tmp_path / ".dvml-lint.toml"
+    toml_file.write_text(
+        "[naming]\n"
+        'hub = "h_"\n'
+        'sat = "s_"\n'
+        'link = "l_"\n'
+        'nhsat = "ns_"\n'
+        'nhlink = "nl_"\n'
+        'effsat = "es_"\n'
+        'samlink = "sl_"\n'
+        'bridge = "br_"\n'
+        'pit = "pit_"\n'
+    )
+    bk = BusinessKeyDef(name="id", data_type="int")
+    fd = FieldDef(name="x", data_type="string")
+    module = DVMLModule(
+        namespace="test",
+        hubs=[HubDecl(name="X", business_keys=[bk])],
+        satellites=[SatelliteDecl(name="X", parent_ref="H", fields=[fd])],
+        links=[LinkDecl(name="X", references=["A", "B"])],
+        nhsats=[NhSatDecl(name="X", parent_ref="H")],
+        nhlinks=[NhLinkDecl(name="X", references=["A", "B"])],
+        effsats=[EffSatDecl(name="X", parent_ref="L")],
+        samlinks=[SamLinkDecl(name="X", master_ref="H", duplicate_ref="H")],
+        bridges=[BridgeDecl(name="X", path=[])],
+        pits=[PitDecl(name="X", anchor_ref="H")],
+    )
+    diags = [d for d in lint(module, config_path=toml_file) if d.rule == "naming-convention"]
+    assert len(diags) == 9
+
+
+def test_naming_bridge_missing_prefix(tmp_path: Path) -> None:
+    """BridgeDecl with a name that violates the configured prefix produces a naming-convention diagnostic."""
+    toml_file = tmp_path / ".dvml-lint.toml"
+    toml_file.write_text('[naming]\nbridge = "br_"\n')
+    module = DVMLModule(
+        namespace="test",
+        bridges=[BridgeDecl(name="MyBridge", path=[])],
+    )
+    diags = [d for d in lint(module, config_path=toml_file) if d.rule == "naming-convention"]
+    assert len(diags) == 1
+    assert "does not start with required prefix 'br_'" in diags[0].message
+
+
+def test_naming_pit_missing_prefix(tmp_path: Path) -> None:
+    """PitDecl with a name that violates the configured prefix produces a naming-convention diagnostic."""
+    toml_file = tmp_path / ".dvml-lint.toml"
+    toml_file.write_text('[naming]\npit = "pit_"\n')
+    module = DVMLModule(
+        namespace="test",
+        pits=[PitDecl(name="MyPit", anchor_ref="H")],
+    )
+    diags = [d for d in lint(module, config_path=toml_file) if d.rule == "naming-convention"]
+    assert len(diags) == 1
+    assert "does not start with required prefix 'pit_'" in diags[0].message
+
+
+def test_naming_bridge_correct_prefix(tmp_path: Path) -> None:
+    """BridgeDecl with a name that satisfies the configured prefix produces no naming-convention diagnostic."""
+    toml_file = tmp_path / ".dvml-lint.toml"
+    toml_file.write_text('[naming]\nbridge = "br_"\n')
+    module = DVMLModule(
+        namespace="test",
+        bridges=[BridgeDecl(name="br_Sales", path=[])],
+    )
+    diags = [d for d in lint(module, config_path=toml_file) if d.rule == "naming-convention"]
+    assert len(diags) == 0
+
+
+def test_naming_pit_correct_prefix(tmp_path: Path) -> None:
+    """PitDecl with a name that satisfies the configured prefix produces no naming-convention diagnostic."""
+    toml_file = tmp_path / ".dvml-lint.toml"
+    toml_file.write_text('[naming]\npit = "pit_"\n')
+    module = DVMLModule(
+        namespace="test",
+        pits=[PitDecl(name="pit_Sales", anchor_ref="H")],
+    )
+    diags = [d for d in lint(module, config_path=toml_file) if d.rule == "naming-convention"]
+    assert len(diags) == 0
