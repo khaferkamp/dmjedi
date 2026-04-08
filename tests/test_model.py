@@ -442,7 +442,7 @@ def test_bridge_path_too_short_raises():
         links=[link_cp],
         bridges=[bridge_decl],
     )
-    with pytest.raises(ResolverErrors, match="at least 3 elements"):
+    with pytest.raises(ValidationError, match="at least 3 elements"):
         resolve([module])
 
 
