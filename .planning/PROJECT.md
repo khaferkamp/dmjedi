@@ -2,49 +2,38 @@
 
 ## Overview
 
-DMJEDI is a CLI for Data Vault 2.1 modeling and data warehouse automation. Users write `.dv` files in DVML (Data Vault Modeling Language), and the CLI validates, lints, generates pipeline code, and produces documentation. Licensed AGPL-3.0-or-later.
+DMJEDI is a CLI for Data Vault 2.1 modeling and data warehouse automation. Users write `.dv` files in DVML (Data Vault Modeling Language), and the CLI validates, lints, generates pipeline code, and produces documentation for the full DV 2.1 entity specification. Licensed AGPL-3.0-or-later.
 
 ## Audience
 
 Team of data engineers using DMJEDI for internal Data Vault projects. Both Databricks/Spark and SQL/dbt platforms are used equally.
 
-## Current State (v0.1.0 + Phase 7)
+## Current State (v0.1.1)
 
 **Shipped capabilities:**
 - Functional CLI: `validate`, `generate`, `docs` commands working end-to-end
-- DVML parser with Lark grammar, AST, and 4 lint rules
+- DVML parser with Lark grammar, AST, parser caching (singleton), structured error reporting with Rich
+- Support for all 9 DV 2.1 entity types: hub, satellite, link, nhsat, nhlink, effsat, samlink, bridge, pit
+- 4 data types with optional parameters (bigint, float, varchar, binary) plus core types (int, string, decimal, date, timestamp, boolean, json)
 - Multi-file support: directory discovery, imports with circular detection
-- Resolver with duplicate detection and parent ref validation
-- SQL Jinja generator with 3 SQL dialect type mappings (default, postgres, spark)
-- Spark Declarative generator producing functional Databricks DLT Python
-- Markdown documentation generator
+- Resolver with duplicate detection, parent ref validation, bridge path chain validation (LINT-04), PIT satellite ownership (LINT-05)
+- 5 linter rules: hub needs BKs, satellite needs parent, link needs 2+ refs, effsat parent must be link, samlink same-hub, naming conventions (all 9 entity types)
+- SQL Jinja generator with 9 entity templates, 3 dialect mappings (default, postgres, spark), `--dialect` CLI flag
+- Spark Declarative generator producing Databricks DLT Python for all 9 entity types (@dlt.table, @dlt.view, dlt.apply_changes)
+- Markdown documentation generator with Raw Vault / Query Assist grouping and Mermaid ER diagrams
 - Generator plugin system with registry
-- Phase 7 complete: Parser caching (singleton), structured error reporting with Rich, 4 new data types (bigint, float, varchar, binary) with optional parameters, shared type mapping module (model/types.py), grammar + AST for all 6 new entity types (nhsat, nhlink, effsat, samlink, bridge, pit)
-- Phase 8 complete: NhSat and NhLink domain model classes, resolver extension with parent validation, SQL Jinja MERGE INTO templates, Spark DLT apply_changes(stored_as_scd_type=1) generators
-- Phase 9 complete: EffSat and SamLink domain model classes, resolver extension, linter rules (LINT-01 effsat parent, LINT-02 samlink same-hub, LINT-03 naming convention)
-- Phase 10 complete: Bridge and PIT domain model classes, resolver with LINT-04 (bridge path chain validation) and LINT-05 (PIT satellite ownership), SQL Jinja CREATE VIEW templates, Spark DLT @dlt.view generators, views/ output directory
-- Phase 11 complete: EffSat/SamLink MERGE SQL + Spark generators, docs generator with Raw Vault/Query Assist grouping + Mermaid ER diagrams, CLI --dialect flag for SQL Jinja dialect selection
-- 195 tests across 10 test files
+- 202 tests across 10 test files
 
 **Known limitations:**
 - LSP server is a placeholder (pygls dependency unused)
-
 - No path traversal protection on imports (dormant — needs implementing when imports go public)
 
-## Current Milestone: v0.1.1 Complete DV 2.1 Entity Coverage
+## Milestone History
 
-**Goal:** Extend DVML to support the full Data Vault Alliance 2.1 entity specification with end-to-end pipeline support for all new types, plus parser hardening.
-
-**Target features:**
-- Effectivity Satellites (temporal validity on link relationships)
-- Same-As Links (cross-source entity matching)
-- Non-Historized Satellites (current-state-only, no history)
-- Non-Historized Links (current-state-only links)
-- Bridge Tables (denormalized access patterns)
-- Point-in-Time Tables (snapshot query optimization)
-- Parser caching (reuse Lark instance)
-- Better parse error messages with source locations
-- General parser hardening
+| Version | Name | Phases | Tests | Status |
+|---------|------|--------|-------|--------|
+| v0.1.0 | Complete Core CLI | 6 | 75 | Shipped |
+| v0.1.1 | Complete DV 2.1 Entity Coverage | 6 | 202 | Shipped |
 
 ## Technical Constraints
 
@@ -54,22 +43,33 @@ Team of data engineers using DMJEDI for internal Data Vault projects. Both Datab
 - Typer for CLI, Rich for terminal output
 - Ruff + mypy strict for quality gates
 
+## Key Decisions
+
+| Decision | Milestone | Outcome |
+|----------|-----------|---------|
+| Two-layer model (AST vs domain) | v0.1.0 | ✓ Clean separation, resolver bridges cleanly |
+| Separate domain classes per entity type | v0.1.1 | ✓ Generator dispatch clean, no type flags needed |
+| MERGE for nhsat/nhlink/effsat/samlink | v0.1.1 | ✓ Correct SCD Type 1 semantics |
+| CREATE VIEW for bridge/pit | v0.1.1 | ✓ Query-assist constructs are views, not tables |
+| Linter rules as warnings, resolver as errors | v0.1.1 | ✓ Appropriate severity levels |
+| Naming convention via .dvml-lint.toml | v0.1.1 | ✓ Configurable, optional, project-level |
+
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
 
-**After each phase transition** (via `/gsd-transition`):
+**After each phase transition:**
 1. Requirements invalidated? → Move to Out of Scope with reason
 2. Requirements validated? → Move to Validated with phase reference
 3. New requirements emerged? → Add to Active
 4. Decisions to log? → Add to Key Decisions
 5. "What This Is" still accurate? → Update if drifted
 
-**After each milestone** (via `/gsd-complete-milestone`):
+**After each milestone:**
 1. Full review of all sections
 2. Core Value check — still the right priority?
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-08 after Phase 11 completion (milestone v0.1.1 complete)*
+*Last updated: 2026-04-08 after v0.1.1 milestone completion*

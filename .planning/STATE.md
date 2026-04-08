@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v0.1.1
 milestone_name: Complete DV 2.1 Entity Coverage
-status: Milestone complete
-last_updated: "2026-04-08T19:47:36.583Z"
+status: v0.1.1 milestone complete
+last_updated: "2026-04-08T19:48:56.596Z"
 progress:
   total_phases: 6
   completed_phases: 6
