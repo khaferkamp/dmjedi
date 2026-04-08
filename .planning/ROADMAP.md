@@ -22,7 +22,7 @@
 - [ ] **Phase 8: Non-Historized Entities** - Add nhsat and nhlink as the simplest new entity types with full pipeline support
 - [ ] **Phase 9: Effectivity Satellites and Same-As Links** - Add the two remaining raw vault entity types with their validation rules
 - [x] **Phase 10: Bridge and PIT Tables** - Add the two query-assist constructs with cross-entity validation (completed 2026-04-08)
-- [ ] **Phase 11: Output Completeness** - Ensure all generators, docs, and CLI cover all 6 new entity types end-to-end
+- [x] **Phase 11: Output Completeness** - Ensure all generators, docs, and CLI cover all 6 new entity types end-to-end (completed 2026-04-08)
 
 ## Phase Details
 
@@ -95,11 +95,11 @@ Plans:
   3. `dmjedi docs` output includes sections for all 6 new entity types
   4. `dmjedi docs` produces Mermaid entity-relationship diagrams covering all entity types
   5. User can pass `--dialect` flag to `dmjedi generate` to select SQL Jinja dialect (default, postgres, spark)
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 Plans:
-- [ ] 11-01-PLAN.md — EffSat and SamLink code generation (SQL Jinja + Spark DLT)
-- [ ] 11-02-PLAN.md — Docs generator expansion with all entity types and Mermaid ER diagrams
-- [ ] 11-03-PLAN.md — CLI --dialect flag for SQL Jinja dialect selection
+- [x] 11-01-PLAN.md — EffSat and SamLink code generation (SQL Jinja + Spark DLT)
+- [x] 11-02-PLAN.md — Docs generator expansion with all entity types and Mermaid ER diagrams
+- [x] 11-03-PLAN.md — CLI --dialect flag for SQL Jinja dialect selection
 
 ## Progress
 
@@ -112,4 +112,4 @@ Phases execute in numeric order: 7 -> 8 -> 9 -> 10 -> 11
 | 8. Non-Historized Entities | v0.1.1 | 0/2 | Not started | - |
 | 9. Effectivity Satellites and Same-As Links | v0.1.1 | 0/2 | Not started | - |
 | 10. Bridge and PIT Tables | v0.1.1 | 2/2 | Complete    | 2026-04-08 |
-| 11. Output Completeness | v0.1.1 | 0/3 | Not started | - |
+| 11. Output Completeness | v0.1.1 | 3/3 | Complete    | 2026-04-08 |
