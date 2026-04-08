@@ -6,14 +6,14 @@ SELECT
     h.{{ pit.anchor_ref }}_hk
     , h.load_ts AS snap_load_ts
 {%- for sat in pit.tracked_satellites %}
-    , {{ sat }}.load_ts AS {{ sat }}_load_ts
-    , {{ sat }}.hash_diff AS {{ sat }}_hash_diff
+    , {{ sat }}_alias.load_ts AS {{ sat }}_load_ts
+    , {{ sat }}_alias.hash_diff AS {{ sat }}_hash_diff
 {%- endfor %}
 FROM {{ pit.anchor_ref }} h
 {%- for sat in pit.tracked_satellites %}
-LEFT JOIN {{ sat }}
-    ON {{ sat }}.{{ pit.anchor_ref }}_hk = h.{{ pit.anchor_ref }}_hk
-    AND {{ sat }}.load_ts = (
+LEFT JOIN {{ sat }} AS {{ sat }}_alias
+    ON {{ sat }}_alias.{{ pit.anchor_ref }}_hk = h.{{ pit.anchor_ref }}_hk
+    AND {{ sat }}_alias.load_ts = (
         SELECT MAX(s2.load_ts) FROM {{ sat }} s2
         WHERE s2.{{ pit.anchor_ref }}_hk = h.{{ pit.anchor_ref }}_hk
     )
