@@ -58,9 +58,44 @@ class Link(BaseModel):
         return f"{self.namespace}.{self.name}" if self.namespace else self.name
 
 
+class NhSat(BaseModel):
+    """A resolved non-historized satellite (current-state-only)."""
+
+    name: str
+    namespace: str = ""
+    parent_ref: str
+    columns: list[Column] = []
+
+    @property
+    def qualified_name(self) -> str:
+        return f"{self.namespace}.{self.name}" if self.namespace else self.name
+
+
+class NhLink(BaseModel):
+    """A resolved non-historized link (current-state-only)."""
+
+    name: str
+    namespace: str = ""
+    hub_references: list[str] = []
+    columns: list[Column] = []
+
+    @model_validator(mode="after")
+    def _check_min_refs(self) -> "NhLink":
+        if len(self.hub_references) < 2:
+            msg = f"NhLink '{self.name}' must reference at least 2 hubs"
+            raise ValueError(msg)
+        return self
+
+    @property
+    def qualified_name(self) -> str:
+        return f"{self.namespace}.{self.name}" if self.namespace else self.name
+
+
 class DataVaultModel(BaseModel):
     """A complete, resolved Data Vault 2.1 model built from one or more DVML modules."""
 
     hubs: dict[str, Hub] = {}
     satellites: dict[str, Satellite] = {}
     links: dict[str, Link] = {}
+    nhsats: dict[str, NhSat] = {}
+    nhlinks: dict[str, NhLink] = {}
