@@ -371,7 +371,12 @@ def resolve(modules: list[DVMLModule]) -> DataVaultModel:
         ns_anchor = f"{pit.namespace}.{anchor}" if pit.namespace else anchor
         for sat_ref in pit.tracked_satellites:
             ns_sat_ref = f"{pit.namespace}.{sat_ref}" if pit.namespace else sat_ref
-            sat_or_none = model.satellites.get(sat_ref) or model.satellites.get(ns_sat_ref)
+            sat_or_none = (
+                model.satellites.get(sat_ref)
+                or model.satellites.get(ns_sat_ref)
+                or model.nhsats.get(sat_ref)
+                or model.nhsats.get(ns_sat_ref)
+            )
             if sat_or_none is None:
                 errors.append(
                     ResolverError(
