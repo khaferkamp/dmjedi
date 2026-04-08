@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import tomllib
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from dmjedi.lang.ast import DVMLModule, SourceLocation
 
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from dmjedi.model.core import DataVaultModel
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     ERROR = "error"
     WARNING = "warning"
     INFO = "info"
@@ -155,7 +155,8 @@ def _load_lint_config(config_path: Path) -> dict[str, str]:
         return {}
     with config_path.open("rb") as f:
         data = tomllib.load(f)
-    return data.get("naming", {})
+    naming: dict[str, str] = data.get("naming", {})
+    return naming
 
 
 def _check_naming(
@@ -165,7 +166,7 @@ def _check_naming(
     if not config:
         return []
     diags: list[LintDiagnostic] = []
-    checks: list[tuple[str, list]] = [
+    checks: list[tuple[str, list[Any]]] = [
         ("hub", module.hubs),
         ("sat", module.satellites),
         ("link", module.links),

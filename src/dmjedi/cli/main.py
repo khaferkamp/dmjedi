@@ -8,14 +8,13 @@ import typer
 from rich.console import Console
 
 from dmjedi.cli.errors import format_parse_error, print_diagnostics
-from dmjedi.lang.parser import DVMLParseError
 from dmjedi.docs.markdown import generate_markdown
 from dmjedi.generators import registry
 from dmjedi.lang.ast import DVMLModule
 from dmjedi.lang.discovery import discover_dv_files
 from dmjedi.lang.imports import CircularImportError, resolve_imports
 from dmjedi.lang.linter import LintDiagnostic, Severity, lint
-from dmjedi.lang.parser import parse_file
+from dmjedi.lang.parser import DVMLParseError, parse_file
 from dmjedi.model.resolver import ResolverErrors, resolve
 
 app = typer.Typer(
@@ -46,14 +45,24 @@ def validate(
 
     # Also run resolver to catch cross-module errors
     try:
-        resolve(modules)
+        model = resolve(modules)
     except ResolverErrors as e:
         for err in e.errors:
             loc = f"{err.source_file}:{err.line} " if err.source_file else ""
             console.print(f"[red]E[/red] {loc}{err.message}")
         raise typer.Exit(code=1) from None
 
-    if not all_diagnostics:
+    # Post-resolve lint for model-aware rules (LINT-01 effsat parent check)
+    post_resolve_diags: list[LintDiagnostic] = []
+    for module in modules:
+        post_resolve_diags.extend(lint(module, model=model))
+    model_aware_diags = [
+        d for d in post_resolve_diags if d.rule in ("effsat-parent-must-be-link",)
+    ]
+    if model_aware_diags:
+        print_diagnostics(model_aware_diags, console)
+
+    if not all_diagnostics and not model_aware_diags:
         console.print("[green]All files valid.[/green]")
 
 
@@ -86,6 +95,16 @@ def generate(
             loc = f"{err.source_file}:{err.line} " if err.source_file else ""
             console.print(f"[red]E[/red] {loc}{err.message}")
         raise typer.Exit(code=1) from None
+
+    # Post-resolve lint for model-aware rules (LINT-01 effsat parent check)
+    post_resolve_diags: list[LintDiagnostic] = []
+    for module in modules:
+        post_resolve_diags.extend(lint(module, model=model))
+    model_aware_diags = [
+        d for d in post_resolve_diags if d.rule in ("effsat-parent-must-be-link",)
+    ]
+    if model_aware_diags:
+        print_diagnostics(model_aware_diags, console)
 
     # Generate
     try:
@@ -127,6 +146,16 @@ def docs(
             loc = f"{err.source_file}:{err.line} " if err.source_file else ""
             console.print(f"[red]E[/red] {loc}{err.message}")
         raise typer.Exit(code=1) from None
+
+    # Post-resolve lint for model-aware rules (LINT-01 effsat parent check)
+    post_resolve_diags: list[LintDiagnostic] = []
+    for module in modules:
+        post_resolve_diags.extend(lint(module, model=model))
+    model_aware_diags = [
+        d for d in post_resolve_diags if d.rule in ("effsat-parent-must-be-link",)
+    ]
+    if model_aware_diags:
+        print_diagnostics(model_aware_diags, console)
 
     markdown = generate_markdown(model)
 
