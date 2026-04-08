@@ -54,4 +54,16 @@ class SqlJinjaGenerator(BaseGenerator):
                 f"links/nhlink_{nhlink.name}.sql", nhlink_tpl.render(nhlink=nhlink)
             )
 
+        bridge_tpl = env.get_template("bridge.sql.j2")
+        for bridge in model.bridges.values():
+            result.add_file(
+                f"views/bridge_{bridge.name}.sql", bridge_tpl.render(bridge=bridge)
+            )
+
+        pit_tpl = env.get_template("pit.sql.j2")
+        for pit in model.pits.values():
+            result.add_file(
+                f"views/pit_{pit.name}.sql", pit_tpl.render(pit=pit)
+            )
+
         return result
