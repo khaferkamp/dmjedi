@@ -2,8 +2,9 @@
 
 from dmjedi.generators.base import BaseGenerator, GeneratorResult
 from dmjedi.model.core import DataVaultModel, Hub, Link, Satellite
+from dmjedi.model.types import map_pyspark_type
 
-_IMPORTS = 'import dlt\nfrom pyspark.sql import functions as F\n'
+_IMPORTS = 'import dlt\nfrom pyspark.sql import functions as F\nfrom pyspark.sql.types import *\n'
 
 
 class SparkDeclarativeGenerator(BaseGenerator):
@@ -49,7 +50,10 @@ class SparkDeclarativeGenerator(BaseGenerator):
         table_name = f"sat_{sat.name}"
         col_names = [c.name for c in sat.columns]
         col_concat = ", ".join(f'F.col("{c}")' for c in col_names)
-        col_selects = "".join(f'        F.col("{c}"),\n' for c in col_names)
+        col_selects = "".join(
+            f'        F.col("{c.name}").cast({map_pyspark_type(c.data_type)}),\n'
+            for c in sat.columns
+        )
 
         # hash_diff line: hash all user columns together
         if col_names:
@@ -85,7 +89,10 @@ class SparkDeclarativeGenerator(BaseGenerator):
         ref_hk_names = [f"{ref}_hk" for ref in link.hub_references]
         ref_concat = ", ".join(f'F.col("{hk}")' for hk in ref_hk_names)
         ref_selects = "".join(f'        F.col("{hk}"),\n' for hk in ref_hk_names)
-        col_selects = "".join(f'        F.col("{c.name}"),\n' for c in link.columns)
+        col_selects = "".join(
+            f'        F.col("{c.name}").cast({map_pyspark_type(c.data_type)}),\n'
+            for c in link.columns
+        )
         refs_doc = ", ".join(link.hub_references)
 
         return (
