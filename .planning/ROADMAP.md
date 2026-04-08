@@ -21,7 +21,7 @@
 - [ ] **Phase 7: Parser Hardening and Data Types** - Harden the parser foundation and extend the type system before adding new entities
 - [ ] **Phase 8: Non-Historized Entities** - Add nhsat and nhlink as the simplest new entity types with full pipeline support
 - [ ] **Phase 9: Effectivity Satellites and Same-As Links** - Add the two remaining raw vault entity types with their validation rules
-- [ ] **Phase 10: Bridge and PIT Tables** - Add the two query-assist constructs with cross-entity validation
+- [x] **Phase 10: Bridge and PIT Tables** - Add the two query-assist constructs with cross-entity validation (completed 2026-04-08)
 - [ ] **Phase 11: Output Completeness** - Ensure all generators, docs, and CLI cover all 6 new entity types end-to-end
 
 ## Phase Details
@@ -80,10 +80,10 @@ Plans:
   3. Resolver validates that a bridge path forms a connected chain through existing hubs and links
   4. Resolver validates that PIT-tracked satellites belong to the PIT's anchor hub
   5. Generated SQL and Spark code for bridge and PIT produce views/SELECT statements, not CREATE TABLE
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 Plans:
-- [ ] 10-01-PLAN.md — Bridge and Pit domain model, resolver loops, LINT-04/LINT-05 validation
-- [ ] 10-02-PLAN.md — SQL Jinja and Spark DLT view-based code generation for bridge and PIT
+- [x] 10-01-PLAN.md — Bridge and Pit domain model, resolver loops, LINT-04/LINT-05 validation
+- [x] 10-02-PLAN.md — SQL Jinja and Spark DLT view-based code generation for bridge and PIT
 
 ### Phase 11: Output Completeness
 **Goal**: All generators, documentation, and CLI fully support every new entity type end-to-end
@@ -107,5 +107,5 @@ Phases execute in numeric order: 7 -> 8 -> 9 -> 10 -> 11
 | 7. Parser Hardening and Data Types | v0.1.1 | 0/2 | Not started | - |
 | 8. Non-Historized Entities | v0.1.1 | 0/2 | Not started | - |
 | 9. Effectivity Satellites and Same-As Links | v0.1.1 | 0/2 | Not started | - |
-| 10. Bridge and PIT Tables | v0.1.1 | 0/2 | Not started | - |
+| 10. Bridge and PIT Tables | v0.1.1 | 2/2 | Complete    | 2026-04-08 |
 | 11. Output Completeness | v0.1.1 | 0/? | Not started | - |
