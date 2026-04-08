@@ -3,7 +3,19 @@
 from dmjedi.generators import registry
 from dmjedi.generators.sql_jinja.generator import SqlJinjaGenerator
 from dmjedi.generators.sql_jinja.types import map_type
-from dmjedi.model.core import Bridge, Column, DataVaultModel, Hub, Link, NhLink, NhSat, Pit, Satellite
+from dmjedi.model.core import (
+    Bridge,
+    Column,
+    DataVaultModel,
+    EffSat,
+    Hub,
+    Link,
+    NhLink,
+    NhSat,
+    Pit,
+    SamLink,
+    Satellite,
+)
 
 
 def _sample_model() -> DataVaultModel:
@@ -618,3 +630,134 @@ def test_spark_pit_no_dlt_table():
     result = gen.generate(_sample_model_with_bridge_pit())
     code = result.files["views/pit_CustPit.py"]
     assert "@dlt.table" not in code
+
+
+# --- EffSat / SamLink helper ---
+
+
+def _sample_model_with_effsat_samlink() -> DataVaultModel:
+    """DataVaultModel including EffSat and SamLink entities for generator tests."""
+    return DataVaultModel(
+        effsats={
+            "sales.CustProdValidity": EffSat(
+                name="CustProdValidity",
+                namespace="sales",
+                parent_ref="CustomerProduct",
+                columns=[
+                    Column(name="valid_from", data_type="timestamp"),
+                    Column(name="valid_to", data_type="timestamp"),
+                ],
+            )
+        },
+        samlinks={
+            "sales.CustomerMatch": SamLink(
+                name="CustomerMatch",
+                namespace="sales",
+                master_ref="Customer",
+                duplicate_ref="Customer",
+                columns=[Column(name="confidence", data_type="decimal")],
+            )
+        },
+    )
+
+
+# --- SQL Jinja EffSat tests ---
+
+
+def test_sql_effsat_output_valid():
+    """EffSat SQL uses MERGE INTO, parent_ref_hk as key, columns rendered, no historized fields."""
+    gen = registry.get("sql-jinja")
+    result = gen.generate(_sample_model_with_effsat_samlink())
+    assert "satellites/effsat_CustProdValidity.sql" in result.files
+    sql = result.files["satellites/effsat_CustProdValidity.sql"]
+    _assert_valid_sql(sql)
+    assert "MERGE INTO" in sql
+    assert "CustomerProduct_hk" in sql
+    assert "valid_from" in sql
+    assert "valid_to" in sql
+    assert "hash_diff" not in sql
+    assert "load_end_ts" not in sql
+
+
+def test_sql_effsat_no_columns_valid():
+    """EffSat with empty columns still produces valid MERGE SQL (no trailing comma)."""
+    model = DataVaultModel(
+        effsats={
+            "s.EmptyEffSat": EffSat(
+                name="EmptyEffSat", namespace="s", parent_ref="SomeLink", columns=[]
+            )
+        },
+    )
+    gen = registry.get("sql-jinja")
+    result = gen.generate(model)
+    assert "satellites/effsat_EmptyEffSat.sql" in result.files
+    sql = result.files["satellites/effsat_EmptyEffSat.sql"]
+    _assert_valid_sql(sql)
+    assert "MERGE INTO" in sql
+
+
+# --- SQL Jinja SamLink tests ---
+
+
+def test_sql_samlink_output_valid():
+    """SamLink SQL uses MERGE INTO, samlink_name_hk as key, master/duplicate refs, columns rendered."""
+    gen = registry.get("sql-jinja")
+    result = gen.generate(_sample_model_with_effsat_samlink())
+    assert "links/samlink_CustomerMatch.sql" in result.files
+    sql = result.files["links/samlink_CustomerMatch.sql"]
+    _assert_valid_sql(sql)
+    assert "MERGE INTO" in sql
+    assert "CustomerMatch_hk" in sql
+    assert "Customer_hk" in sql
+    assert "confidence" in sql
+
+
+def test_sql_samlink_no_columns_valid():
+    """SamLink with empty columns still produces valid MERGE SQL."""
+    model = DataVaultModel(
+        samlinks={
+            "s.EmptySam": SamLink(
+                name="EmptySam", namespace="s", master_ref="HubA", duplicate_ref="HubA", columns=[]
+            )
+        },
+    )
+    gen = registry.get("sql-jinja")
+    result = gen.generate(model)
+    assert "links/samlink_EmptySam.sql" in result.files
+    sql = result.files["links/samlink_EmptySam.sql"]
+    _assert_valid_sql(sql)
+    assert "MERGE INTO" in sql
+
+
+# --- Spark DLT EffSat / SamLink tests ---
+
+
+def test_spark_effsat_output_functional():
+    """EffSat Spark code uses dlt.apply_changes with stored_as_scd_type=1, parent_ref_hk key."""
+    gen = registry.get("spark-declarative")
+    result = gen.generate(_sample_model_with_effsat_samlink())
+    assert "satellites/effsat_CustProdValidity.py" in result.files
+    code = result.files["satellites/effsat_CustProdValidity.py"]
+    assert "import dlt" in code
+    assert "apply_changes" in code
+    assert "stored_as_scd_type=1" in code
+    assert "CustomerProduct_hk" in code
+    assert "effsat_CustProdValidity" in code
+    # apply_changes infers schema at runtime — column names must NOT appear
+    assert "valid_from" not in code
+    assert "valid_to" not in code
+
+
+def test_spark_samlink_output_functional():
+    """SamLink Spark code uses dlt.apply_changes with stored_as_scd_type=1, samlink_name_hk key."""
+    gen = registry.get("spark-declarative")
+    result = gen.generate(_sample_model_with_effsat_samlink())
+    assert "links/samlink_CustomerMatch.py" in result.files
+    code = result.files["links/samlink_CustomerMatch.py"]
+    assert "import dlt" in code
+    assert "apply_changes" in code
+    assert "stored_as_scd_type=1" in code
+    assert "CustomerMatch_hk" in code
+    assert "samlink_CustomerMatch" in code
+    # apply_changes infers schema at runtime — column names must NOT appear
+    assert "confidence" not in code
