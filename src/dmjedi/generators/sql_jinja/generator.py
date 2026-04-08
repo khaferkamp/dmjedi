@@ -42,4 +42,16 @@ class SqlJinjaGenerator(BaseGenerator):
         for link in model.links.values():
             result.add_file(f"links/{link.name}.sql", link_tpl.render(link=link))
 
+        nhsat_tpl = env.get_template("nhsat.sql.j2")
+        for nhsat in model.nhsats.values():
+            result.add_file(
+                f"satellites/nhsat_{nhsat.name}.sql", nhsat_tpl.render(nhsat=nhsat)
+            )
+
+        nhlink_tpl = env.get_template("nhlink.sql.j2")
+        for nhlink in model.nhlinks.values():
+            result.add_file(
+                f"links/nhlink_{nhlink.name}.sql", nhlink_tpl.render(nhlink=nhlink)
+            )
+
         return result
