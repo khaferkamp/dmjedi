@@ -254,6 +254,9 @@ class SparkDeclarativeGenerator(BaseGenerator):
     def _generate_bridge(self, bridge: Bridge) -> str:
         view_name = f"bridge_{bridge.name}"
         path = bridge.path
+        if not path:
+            # Empty path is a valid but incomplete bridge; emit a stub comment.
+            return f"# Bridge {bridge.name}: no path defined\n"
         path_str = " -> ".join(path)
 
         # Build join chain code lines
