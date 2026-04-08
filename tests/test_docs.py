@@ -1,7 +1,5 @@
 """Tests for the markdown documentation generator covering all entity types and Mermaid ER."""
 
-import pytest
-
 from dmjedi.docs.markdown import generate_markdown
 from dmjedi.model.core import (
     Bridge,
