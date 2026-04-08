@@ -91,6 +91,25 @@ def test_docs_valid(tmp_path: Path) -> None:
     assert "Customer" in content
 
 
+def test_docs_exits_on_model_aware_error(tmp_path: Path) -> None:
+    """docs command exits with code 1 when model-aware lint finds errors (effsat references hub)."""
+    dv_file = tmp_path / "bad.dv"
+    dv_file.write_text(
+        "namespace test\n"
+        "hub Customer { business_key id: int }\n"
+        "effsat CustomerStatus of Customer { }\n"
+    )
+    result = runner.invoke(app, ["docs", str(dv_file), "--output", str(tmp_path / "out")])
+    assert result.exit_code == 1
+
+
+def test_docs_passes_on_warnings_only(tmp_path: Path) -> None:
+    """docs command exits with code 0 when model-aware lint produces only warnings."""
+    result = runner.invoke(app, ["docs", "examples/sales-domain.dv", "--output", str(tmp_path)])
+    assert result.exit_code == 0
+    assert (tmp_path / "model.md").exists()
+
+
 # --- error formatting ---
 
 

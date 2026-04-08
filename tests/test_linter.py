@@ -2,8 +2,6 @@
 
 from pathlib import Path
 
-import pytest
-
 from dmjedi.lang.ast import (
     BridgeDecl,
     BusinessKeyDef,
@@ -111,7 +109,7 @@ def test_effsat_parent_not_link():
     )
     diags = [d for d in lint(module, model=model) if d.rule == "effsat-parent-must-be-link"]
     assert len(diags) == 1
-    assert diags[0].severity == Severity.WARNING
+    assert diags[0].severity == Severity.ERROR
 
 
 def test_effsat_parent_is_link_no_warning():
@@ -289,7 +287,7 @@ def test_naming_all_nine_types(tmp_path: Path) -> None:
 
 
 def test_naming_bridge_missing_prefix(tmp_path: Path) -> None:
-    """BridgeDecl with a name that violates the configured prefix produces a naming-convention diagnostic."""
+    """BridgeDecl violating configured prefix produces a naming-convention diagnostic."""
     toml_file = tmp_path / ".dvml-lint.toml"
     toml_file.write_text('[naming]\nbridge = "br_"\n')
     module = DVMLModule(
@@ -302,7 +300,7 @@ def test_naming_bridge_missing_prefix(tmp_path: Path) -> None:
 
 
 def test_naming_pit_missing_prefix(tmp_path: Path) -> None:
-    """PitDecl with a name that violates the configured prefix produces a naming-convention diagnostic."""
+    """PitDecl violating configured prefix produces a naming-convention diagnostic."""
     toml_file = tmp_path / ".dvml-lint.toml"
     toml_file.write_text('[naming]\npit = "pit_"\n')
     module = DVMLModule(
@@ -315,7 +313,7 @@ def test_naming_pit_missing_prefix(tmp_path: Path) -> None:
 
 
 def test_naming_bridge_correct_prefix(tmp_path: Path) -> None:
-    """BridgeDecl with a name that satisfies the configured prefix produces no naming-convention diagnostic."""
+    """BridgeDecl satisfying configured prefix produces no naming-convention diagnostic."""
     toml_file = tmp_path / ".dvml-lint.toml"
     toml_file.write_text('[naming]\nbridge = "br_"\n')
     module = DVMLModule(
@@ -327,7 +325,7 @@ def test_naming_bridge_correct_prefix(tmp_path: Path) -> None:
 
 
 def test_naming_pit_correct_prefix(tmp_path: Path) -> None:
-    """PitDecl with a name that satisfies the configured prefix produces no naming-convention diagnostic."""
+    """PitDecl satisfying configured prefix produces no naming-convention diagnostic."""
     toml_file = tmp_path / ".dvml-lint.toml"
     toml_file.write_text('[naming]\npit = "pit_"\n')
     module = DVMLModule(

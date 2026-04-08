@@ -122,7 +122,7 @@ def _check_effsats(
             diags.append(
                 LintDiagnostic(
                     message=f"EffSat '{effsat.name}' parent '{ref}' is a hub, not a link",
-                    severity=Severity.WARNING,
+                    severity=Severity.ERROR,
                     loc=effsat.loc,
                     rule="effsat-parent-must-be-link",
                 )
