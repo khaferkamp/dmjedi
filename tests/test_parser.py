@@ -177,3 +177,60 @@ def test_parse_error_dataclass_fields():
     assert pe.column == 5
     assert pe.hint == "test hint"
     assert hasattr(pe, "source_line")
+
+
+# --- Task 1: nhsat, nhlink, effsat ---
+
+
+def test_parse_nhsat():
+    """NhSatDecl: nhsat with of ref and fields parses into module.nhsats."""
+    source = "nhsat CurrentState of Customer { active : boolean }"
+    module = parse(source)
+    assert len(module.nhsats) == 1
+    nhsat = module.nhsats[0]
+    assert nhsat.name == "CurrentState"
+    assert nhsat.parent_ref == "Customer"
+    assert len(nhsat.fields) == 1
+    assert nhsat.fields[0].name == "active"
+    assert nhsat.fields[0].data_type == "boolean"
+
+
+def test_parse_nhsat_empty_body():
+    """NhSatDecl: nhsat with empty body parses with 0 fields."""
+    source = "nhsat Empty of Hub {}"
+    module = parse(source)
+    assert len(module.nhsats) == 1
+    assert module.nhsats[0].name == "Empty"
+    assert module.nhsats[0].parent_ref == "Hub"
+    assert len(module.nhsats[0].fields) == 0
+
+
+def test_parse_nhlink():
+    """NhLinkDecl: nhlink with references parses into module.nhlinks."""
+    source = "nhlink LatestOrder { references Customer, Product }"
+    module = parse(source)
+    assert len(module.nhlinks) == 1
+    nhlink = module.nhlinks[0]
+    assert nhlink.name == "LatestOrder"
+    assert nhlink.references == ["Customer", "Product"]
+
+
+def test_parse_nhlink_three_refs():
+    """NhLinkDecl: nhlink with 3 references parses all 3."""
+    source = "nhlink BigLink { references A, B, C }"
+    module = parse(source)
+    assert len(module.nhlinks) == 1
+    assert module.nhlinks[0].references == ["A", "B", "C"]
+
+
+def test_parse_effsat():
+    """EffSatDecl: effsat with of ref and temporal fields parses correctly."""
+    source = "effsat LinkValidity of CustomerProduct { valid_from : timestamp  valid_to : timestamp }"
+    module = parse(source)
+    assert len(module.effsats) == 1
+    effsat = module.effsats[0]
+    assert effsat.name == "LinkValidity"
+    assert effsat.parent_ref == "CustomerProduct"
+    assert len(effsat.fields) == 2
+    assert effsat.fields[0].name == "valid_from"
+    assert effsat.fields[1].name == "valid_to"

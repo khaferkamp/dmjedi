@@ -61,6 +61,33 @@ class ImportDecl(BaseModel):
     loc: SourceLocation = SourceLocation()
 
 
+class NhSatDecl(BaseModel):
+    """A non-historized satellite declaration (current-state-only)."""
+
+    name: str
+    parent_ref: str
+    fields: list[FieldDef] = []
+    loc: SourceLocation = SourceLocation()
+
+
+class NhLinkDecl(BaseModel):
+    """A non-historized link declaration (current-state-only)."""
+
+    name: str
+    references: list[str] = []
+    fields: list[FieldDef] = []
+    loc: SourceLocation = SourceLocation()
+
+
+class EffSatDecl(BaseModel):
+    """An effectivity satellite declaration (temporal link validity)."""
+
+    name: str
+    parent_ref: str  # must be a link — enforced by linter in Phase 9
+    fields: list[FieldDef] = []
+    loc: SourceLocation = SourceLocation()
+
+
 class DVMLModule(BaseModel):
     """A parsed DVML file containing all declarations."""
 
@@ -69,4 +96,7 @@ class DVMLModule(BaseModel):
     hubs: list[HubDecl] = []
     satellites: list[SatelliteDecl] = []
     links: list[LinkDecl] = []
+    nhsats: list[NhSatDecl] = []
+    nhlinks: list[NhLinkDecl] = []
+    effsats: list[EffSatDecl] = []
     source_file: str = ""

@@ -9,10 +9,13 @@ from lark.exceptions import UnexpectedCharacters, UnexpectedEOF, UnexpectedInput
 from dmjedi.lang.ast import (
     BusinessKeyDef,
     DVMLModule,
+    EffSatDecl,
     FieldDef,
     HubDecl,
     ImportDecl,
     LinkDecl,
+    NhLinkDecl,
+    NhSatDecl,
     SatelliteDecl,
     SourceLocation,
 )
@@ -101,10 +104,10 @@ class DVMLTransformer(Transformer):  # type: ignore[type-arg]
             )
         return SourceLocation(file=self._source_file)
 
-    def IDENTIFIER(self, token: object) -> str:  # noqa: N802
+    def IDENTIFIER(self, token: object) -> str:
         return str(token)
 
-    def STRING(self, token: object) -> str:  # noqa: N802
+    def STRING(self, token: object) -> str:
         return str(token).strip('"')
 
     def qualified_ref(self, tree: object) -> str:
@@ -222,6 +225,51 @@ class DVMLTransformer(Transformer):  # type: ignore[type-arg]
             name=name, references=refs, fields=fields, loc=self._loc(tree)
         )
 
+    def nhsat_body(self, tree: object) -> list[FieldDef]:
+        return list(tree.children)  # type: ignore[union-attr]
+
+    def nhsat_decl(self, tree: object) -> NhSatDecl:
+        children = tree.children  # type: ignore[union-attr]
+        return NhSatDecl(
+            name=children[0],
+            parent_ref=children[1],
+            fields=children[2],
+            loc=self._loc(tree),
+        )
+
+    def nhlink_member(self, tree: object) -> list[str] | FieldDef:
+        return tree.children[0]  # type: ignore[union-attr]
+
+    def nhlink_body(self, tree: object) -> list[list[str] | FieldDef]:
+        return list(tree.children)  # type: ignore[union-attr]
+
+    def nhlink_decl(self, tree: object) -> NhLinkDecl:
+        children = tree.children  # type: ignore[union-attr]
+        name = children[0]
+        members = children[1]
+        refs: list[str] = []
+        fields: list[FieldDef] = []
+        for m in members:
+            if isinstance(m, list):
+                refs.extend(m)
+            elif isinstance(m, FieldDef):
+                fields.append(m)
+        return NhLinkDecl(
+            name=name, references=refs, fields=fields, loc=self._loc(tree)
+        )
+
+    def effsat_body(self, tree: object) -> list[FieldDef]:
+        return list(tree.children)  # type: ignore[union-attr]
+
+    def effsat_decl(self, tree: object) -> EffSatDecl:
+        children = tree.children  # type: ignore[union-attr]
+        return EffSatDecl(
+            name=children[0],
+            parent_ref=children[1],
+            fields=children[2],
+            loc=self._loc(tree),
+        )
+
     def import_decl(self, tree: object) -> ImportDecl:
         return ImportDecl(path=tree.children[0], loc=self._loc(tree))  # type: ignore[union-attr]
 
@@ -244,6 +292,12 @@ class DVMLTransformer(Transformer):  # type: ignore[type-arg]
                 module.satellites.append(item)
             elif isinstance(item, LinkDecl):
                 module.links.append(item)
+            elif isinstance(item, NhSatDecl):
+                module.nhsats.append(item)
+            elif isinstance(item, NhLinkDecl):
+                module.nhlinks.append(item)
+            elif isinstance(item, EffSatDecl):
+                module.effsats.append(item)
         return module
 
 

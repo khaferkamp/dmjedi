@@ -29,6 +29,9 @@ statement: namespace_decl
          | hub_decl
          | satellite_decl
          | link_decl
+         | nhsat_decl
+         | nhlink_decl
+         | effsat_decl
          | import_decl
 
 // --- Imports ---
@@ -54,6 +57,19 @@ link_body: link_member*
 link_member: references_decl | field_decl
 
 references_decl: "references" qualified_ref ("," qualified_ref)*
+
+// --- Non-Historized Satellite ---
+nhsat_decl: "nhsat" IDENTIFIER "of" qualified_ref "{" nhsat_body "}"
+nhsat_body: field_decl*
+
+// --- Non-Historized Link ---
+nhlink_decl: "nhlink" IDENTIFIER "{" nhlink_body "}"
+nhlink_body: nhlink_member*
+nhlink_member: references_decl | field_decl
+
+// --- Effectivity Satellite ---
+effsat_decl: "effsat" IDENTIFIER "of" qualified_ref "{" effsat_body "}"
+effsat_body: field_decl*
 
 // --- Shared ---
 field_decl: IDENTIFIER ":" data_type
