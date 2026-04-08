@@ -123,4 +123,4 @@ Phases execute in numeric order: 7 -> 8 -> 9 -> 10 -> 11 -> 12
 | 9. Effectivity Satellites and Same-As Links | v0.1.1 | 0/2 | Not started | - |
 | 10. Bridge and PIT Tables | v0.1.1 | 2/2 | Complete    | 2026-04-08 |
 | 11. Output Completeness | v0.1.1 | 3/3 | Complete    | 2026-04-08 |
-| 12. Milestone Polish | v0.1.1 | 0/? | Not started | - |
+| 12. Milestone Polish | v0.1.1 | 1/1 | Complete    | 2026-04-08 |
