@@ -71,9 +71,24 @@ def generate(
     paths: list[Path] = typer.Argument(..., help="DVML files or directories"),
     target: str = typer.Option("spark-declarative", "--target", "-t", help="Generator target"),
     output: Path = typer.Option("output", "--output", "-o", help="Output directory"),
+    dialect: str = typer.Option(
+        "default",
+        "--dialect",
+        help="SQL dialect (default, postgres, spark). Only applies to --target sql-jinja.",
+    ),
 ) -> None:
     """Generate pipeline code from DVML models."""
     console = Console(stderr=True)
+
+    # Validate dialect against allowlist (T-11-05 mitigation)
+    valid_dialects = {"default", "postgres", "spark"}
+    if dialect not in valid_dialects:
+        console.print(
+            f"[red]Error:[/red] Invalid dialect '{dialect}'. "
+            f"Choose from: {', '.join(sorted(valid_dialects))}"
+        )
+        raise typer.Exit(code=1)
+
     modules = _parse_all(paths, console)
 
     # Lint all modules
@@ -106,12 +121,27 @@ def generate(
     if model_aware_diags:
         print_diagnostics(model_aware_diags, console)
 
-    # Generate
-    try:
-        gen = registry.get(target)
-    except KeyError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(code=1) from None
+    # Warn if --dialect used with non-sql-jinja target (per D-15)
+    if dialect != "default" and target != "sql-jinja":
+        console.print(
+            "[yellow]Warning:[/yellow] --dialect is only used with --target sql-jinja; ignoring."
+        )
+
+    # Generate — bypass registry for sql-jinja to pass dialect
+    # (registry returns the default-dialect instance; instantiate directly to honour --dialect)
+    from dmjedi.generators.base import BaseGenerator
+
+    gen: BaseGenerator
+    if target == "sql-jinja":
+        from dmjedi.generators.sql_jinja.generator import SqlJinjaGenerator
+
+        gen = SqlJinjaGenerator(dialect=dialect)
+    else:
+        try:
+            gen = registry.get(target)
+        except KeyError as e:
+            console.print(f"[red]Error:[/red] {e}")
+            raise typer.Exit(code=1) from None
 
     result = gen.generate(model)
     written = result.write(output)
