@@ -61,6 +61,9 @@ def validate(
     ]
     if model_aware_diags:
         print_diagnostics(model_aware_diags, console)
+    model_aware_error_count = sum(1 for d in model_aware_diags if d.severity == Severity.ERROR)
+    if model_aware_error_count > 0:
+        raise typer.Exit(code=1)
 
     if not all_diagnostics and not model_aware_diags:
         console.print("[green]All files valid.[/green]")
@@ -120,6 +123,9 @@ def generate(
     ]
     if model_aware_diags:
         print_diagnostics(model_aware_diags, console)
+    model_aware_error_count = sum(1 for d in model_aware_diags if d.severity == Severity.ERROR)
+    if model_aware_error_count > 0:
+        raise typer.Exit(code=1)
 
     # Warn if --dialect used with non-sql-jinja target (per D-15)
     if dialect != "default" and target != "sql-jinja":
