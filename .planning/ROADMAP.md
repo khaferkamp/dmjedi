@@ -101,10 +101,20 @@ Plans:
 - [x] 11-02-PLAN.md — Docs generator expansion with all entity types and Mermaid ER diagrams
 - [x] 11-03-PLAN.md — CLI --dialect flag for SQL Jinja dialect selection
 
+### Phase 12: Milestone Polish
+**Goal**: Close tech debt items identified by milestone audit — LINT-03 bridge/pit naming coverage and docs command error gate
+**Depends on**: Phase 11
+**Requirements**: LINT-03 (partial fix)
+**Gap Closure:** Closes gaps from v0.1.1 milestone audit
+**Success Criteria** (what must be TRUE):
+  1. `_check_naming()` in linter covers all 9 entity types including bridge and pit
+  2. `docs` command exits with code 1 when model-aware diagnostics contain errors (consistent with validate/generate)
+**Plans**: TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 7 -> 8 -> 9 -> 10 -> 11
+Phases execute in numeric order: 7 -> 8 -> 9 -> 10 -> 11 -> 12
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -113,3 +123,4 @@ Phases execute in numeric order: 7 -> 8 -> 9 -> 10 -> 11
 | 9. Effectivity Satellites and Same-As Links | v0.1.1 | 0/2 | Not started | - |
 | 10. Bridge and PIT Tables | v0.1.1 | 2/2 | Complete    | 2026-04-08 |
 | 11. Output Completeness | v0.1.1 | 3/3 | Complete    | 2026-04-08 |
+| 12. Milestone Polish | v0.1.1 | 0/? | Not started | - |
