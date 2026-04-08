@@ -3,7 +3,7 @@
 from dmjedi.generators import registry
 from dmjedi.generators.sql_jinja.generator import SqlJinjaGenerator
 from dmjedi.generators.sql_jinja.types import map_type
-from dmjedi.model.core import Column, DataVaultModel, Hub, Link, NhLink, NhSat, Satellite
+from dmjedi.model.core import Bridge, Column, DataVaultModel, Hub, Link, NhLink, NhSat, Pit, Satellite
 
 
 def _sample_model() -> DataVaultModel:
@@ -440,3 +440,181 @@ def test_spark_nhsat_no_columns():
     code = result.files["satellites/nhsat_EmptyNhSat.py"]
     assert "apply_changes" in code
     assert "stored_as_scd_type=1" in code
+
+
+# --- Bridge/PIT helper ---
+
+
+def _sample_model_with_bridge_pit() -> DataVaultModel:
+    """DataVaultModel including bridge and pit entities for generator tests."""
+    return DataVaultModel(
+        hubs={
+            "sales.Customer": Hub(
+                name="Customer",
+                namespace="sales",
+                business_keys=[Column(name="customer_id", data_type="int", is_business_key=True)],
+            ),
+            "sales.Product": Hub(
+                name="Product",
+                namespace="sales",
+                business_keys=[Column(name="product_id", data_type="int", is_business_key=True)],
+            ),
+        },
+        satellites={
+            "sales.CustomerDetails": Satellite(
+                name="CustomerDetails",
+                namespace="sales",
+                parent_ref="Customer",
+                columns=[Column(name="first_name", data_type="string")],
+            )
+        },
+        links={
+            "sales.CustomerProduct": Link(
+                name="CustomerProduct",
+                namespace="sales",
+                hub_references=["Customer", "Product"],
+            )
+        },
+        bridges={
+            "sales.CustProd": Bridge(
+                name="CustProd",
+                namespace="sales",
+                path=["Customer", "CustomerProduct", "Product"],
+            )
+        },
+        pits={
+            "sales.CustPit": Pit(
+                name="CustPit",
+                namespace="sales",
+                anchor_ref="Customer",
+                tracked_satellites=["CustomerDetails"],
+            )
+        },
+    )
+
+
+# --- SQL Jinja bridge/PIT tests ---
+
+
+def test_sql_bridge_output_valid():
+    """Bridge SQL generates a CREATE OR REPLACE VIEW with JOIN chain, not a table."""
+    gen = registry.get("sql-jinja")
+    result = gen.generate(_sample_model_with_bridge_pit())
+    assert "views/bridge_CustProd.sql" in result.files
+    sql = result.files["views/bridge_CustProd.sql"]
+    _assert_valid_sql(sql)
+    assert "CREATE OR REPLACE VIEW" in sql
+    assert "CREATE TABLE" not in sql
+    assert "bridge_CustProd" in sql
+    assert "Customer" in sql
+    assert "CustomerProduct" in sql
+    assert "Product" in sql
+    assert "JOIN" in sql
+
+
+def test_sql_pit_output_valid():
+    """PIT SQL generates a CREATE OR REPLACE VIEW with LEFT JOINs for tracked satellites."""
+    gen = registry.get("sql-jinja")
+    result = gen.generate(_sample_model_with_bridge_pit())
+    assert "views/pit_CustPit.sql" in result.files
+    sql = result.files["views/pit_CustPit.sql"]
+    _assert_valid_sql(sql)
+    assert "CREATE OR REPLACE VIEW" in sql
+    assert "CREATE TABLE" not in sql
+    assert "pit_CustPit" in sql
+    assert "Customer_hk" in sql
+    assert "LEFT JOIN" in sql
+    assert "CustomerDetails" in sql
+
+
+def test_sql_bridge_no_create_table():
+    """Generating a model with only a bridge produces no file with CREATE TABLE and bridge in name."""
+    model = DataVaultModel(
+        bridges={
+            "s.MyBridge": Bridge(
+                name="MyBridge",
+                namespace="s",
+                path=["HubA", "LinkAB", "HubB"],
+            )
+        },
+    )
+    gen = registry.get("sql-jinja")
+    result = gen.generate(model)
+    for filename, content in result.files.items():
+        if "bridge" in filename.lower():
+            assert "CREATE TABLE" not in content, f"Expected no CREATE TABLE in {filename}"
+
+
+def test_sql_pit_no_create_table():
+    """Generating a model with only a pit produces no file with CREATE TABLE and pit in name."""
+    model = DataVaultModel(
+        pits={
+            "s.MyPit": Pit(
+                name="MyPit",
+                namespace="s",
+                anchor_ref="SomeHub",
+                tracked_satellites=[],
+            )
+        },
+    )
+    gen = registry.get("sql-jinja")
+    result = gen.generate(model)
+    for filename, content in result.files.items():
+        if "pit" in filename.lower():
+            assert "CREATE TABLE" not in content, f"Expected no CREATE TABLE in {filename}"
+
+
+# --- Spark DLT bridge/PIT tests ---
+
+
+def test_spark_bridge_output_functional():
+    """Bridge Spark code uses @dlt.view, dlt.read calls, and .join() — no @dlt.table."""
+    gen = registry.get("spark-declarative")
+    result = gen.generate(_sample_model_with_bridge_pit())
+    assert "views/bridge_CustProd.py" in result.files
+    code = result.files["views/bridge_CustProd.py"]
+    assert "import dlt" in code
+    assert "@dlt.view(" in code
+    assert "@dlt.table" not in code
+    assert "bridge_CustProd" in code
+    assert "dlt.read" in code
+    assert ".join(" in code
+    lines = [ln.strip() for ln in code.splitlines()]
+    assert "pass" not in lines
+    assert not any("TODO" in ln for ln in lines)
+
+
+def test_spark_pit_output_functional():
+    """PIT Spark code uses @dlt.view, Window/row_number, left join — no @dlt.table."""
+    gen = registry.get("spark-declarative")
+    result = gen.generate(_sample_model_with_bridge_pit())
+    assert "views/pit_CustPit.py" in result.files
+    code = result.files["views/pit_CustPit.py"]
+    assert "import dlt" in code
+    assert "@dlt.view(" in code
+    assert "@dlt.table" not in code
+    assert "pit_CustPit" in code
+    assert "dlt.read" in code
+    assert "Window" in code
+    assert "row_number" in code
+    assert ".join(" in code
+    assert '"left"' in code
+    lines = [ln.strip() for ln in code.splitlines()]
+    assert "pass" not in lines
+    assert not any("TODO" in ln for ln in lines)
+
+
+def test_spark_bridge_no_dlt_table():
+    """Bridge Spark code never uses @dlt.table decorator."""
+    gen = registry.get("spark-declarative")
+    result = gen.generate(_sample_model_with_bridge_pit())
+    code = result.files["views/bridge_CustProd.py"]
+    assert "@dlt.table" not in code
+
+
+def test_spark_pit_no_dlt_table():
+    """PIT Spark code never uses @dlt.table decorator."""
+    gen = registry.get("spark-declarative")
+    result = gen.generate(_sample_model_with_bridge_pit())
+    code = result.files["views/pit_CustPit.py"]
+    assert "@dlt.table" not in code
