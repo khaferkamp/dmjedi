@@ -23,11 +23,12 @@ Team of data engineers using DMJEDI for internal Data Vault projects. Both Datab
 - Phase 8 complete: NhSat and NhLink domain model classes, resolver extension with parent validation, SQL Jinja MERGE INTO templates, Spark DLT apply_changes(stored_as_scd_type=1) generators
 - Phase 9 complete: EffSat and SamLink domain model classes, resolver extension, linter rules (LINT-01 effsat parent, LINT-02 samlink same-hub, LINT-03 naming convention)
 - Phase 10 complete: Bridge and PIT domain model classes, resolver with LINT-04 (bridge path chain validation) and LINT-05 (PIT satellite ownership), SQL Jinja CREATE VIEW templates, Spark DLT @dlt.view generators, views/ output directory
-- 173 tests across 8 test files
+- Phase 11 complete: EffSat/SamLink MERGE SQL + Spark generators, docs generator with Raw Vault/Query Assist grouping + Mermaid ER diagrams, CLI --dialect flag for SQL Jinja dialect selection
+- 195 tests across 10 test files
 
 **Known limitations:**
 - LSP server is a placeholder (pygls dependency unused)
-- No `--dialect` CLI flag for SQL generator (constructor-only)
+
 - No path traversal protection on imports (dormant — needs implementing when imports go public)
 
 ## Current Milestone: v0.1.1 Complete DV 2.1 Entity Coverage
@@ -71,4 +72,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-08 after Phase 10 completion*
+*Last updated: 2026-04-08 after Phase 11 completion (milestone v0.1.1 complete)*
