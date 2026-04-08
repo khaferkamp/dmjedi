@@ -184,6 +184,10 @@ class SparkDeclarativeGenerator(BaseGenerator):
             f")\n"
         )
 
+    def _table_ref(self, name: str) -> str:
+        """Return the unqualified table name for DLT reads (strips namespace prefix)."""
+        return name.split(".")[-1]
+
     def _generate_bridge(self, bridge: Bridge) -> str:
         view_name = f"bridge_{bridge.name}"
         path = bridge.path
@@ -192,9 +196,9 @@ class SparkDeclarativeGenerator(BaseGenerator):
         # Build join chain code lines
         join_lines = ""
         for i in range(1, len(path), 2):
-            link_name = path[i]
-            next_hub = path[i + 1]
-            prev_hub = path[i - 1]
+            link_name = self._table_ref(path[i])
+            next_hub = self._table_ref(path[i + 1])
+            prev_hub = self._table_ref(path[i - 1])
             join_lines += (
                 f'    link_df = dlt.read("{link_name}")\n'
                 f'    hub_df = dlt.read("{next_hub}")\n'
@@ -210,7 +214,7 @@ class SparkDeclarativeGenerator(BaseGenerator):
             f")\n"
             f"def {view_name}():\n"
             f'    """Bridge view traversing: {path_str}."""\n'
-            f'    df = dlt.read("{path[0]}")\n'
+            f'    df = dlt.read("{self._table_ref(path[0])}")\n'
             f"{join_lines}"
             f"    return df\n"
         )
