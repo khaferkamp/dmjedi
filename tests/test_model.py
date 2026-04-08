@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from dmjedi.lang.parser import parse
-from dmjedi.model.core import Link, NhLink, NhSat
+from dmjedi.model.core import EffSat, Link, NhLink, NhSat, SamLink
 from dmjedi.model.resolver import ResolverErrors, resolve
 
 
@@ -203,3 +203,39 @@ def test_duplicate_nhlink_raises():
     mod2 = parse(src)
     with pytest.raises(ResolverErrors, match="Duplicate nhlink"):
         resolve([mod1, mod2])
+
+
+# --- EffSat / SamLink domain model tests ---
+
+
+def test_effsat_qualified_name():
+    """EffSat qualified_name returns 'ns.Name' when namespace is set."""
+    effsat = EffSat(name="Validity", namespace="sales", parent_ref="CO")
+    assert effsat.qualified_name == "sales.Validity"
+
+
+def test_samlink_qualified_name():
+    """SamLink qualified_name returns 'ns.Name' when namespace is set."""
+    samlink = SamLink(name="CustMatch", namespace="crm", master_ref="Customer", duplicate_ref="Customer")
+    assert samlink.qualified_name == "crm.CustMatch"
+
+
+def test_samlink_has_separate_refs():
+    """SamLink stores master_ref and duplicate_ref as separate fields."""
+    samlink = SamLink(name="M", namespace="ns", master_ref="A", duplicate_ref="B")
+    assert samlink.master_ref == "A"
+    assert samlink.duplicate_ref == "B"
+
+
+def test_data_vault_model_has_effsats_samlinks():
+    """DataVaultModel can be constructed with effsats and samlinks dicts."""
+    from dmjedi.model.core import DataVaultModel
+
+    effsat = EffSat(name="E", namespace="n", parent_ref="L")
+    samlink = SamLink(name="S", namespace="n", master_ref="H", duplicate_ref="H")
+    model = DataVaultModel(
+        effsats={"n.E": effsat},
+        samlinks={"n.S": samlink},
+    )
+    assert "n.E" in model.effsats
+    assert "n.S" in model.samlinks
