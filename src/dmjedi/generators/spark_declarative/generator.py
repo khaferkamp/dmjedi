@@ -1,10 +1,16 @@
 """Generator for Databricks Spark Declarative Pipelines (DLT)."""
 
 from dmjedi.generators.base import BaseGenerator, GeneratorResult
-from dmjedi.model.core import DataVaultModel, Hub, Link, NhLink, NhSat, Satellite
+from dmjedi.model.core import Bridge, DataVaultModel, Hub, Link, NhLink, NhSat, Pit, Satellite
 from dmjedi.model.types import map_pyspark_type
 
 _IMPORTS = 'import dlt\nfrom pyspark.sql import functions as F\nfrom pyspark.sql.types import *\n'
+_IMPORTS_VIEW = (
+    'import dlt\n'
+    'from pyspark.sql import functions as F\n'
+    'from pyspark.sql.types import *\n'
+    'from pyspark.sql.window import Window\n'
+)
 
 
 class SparkDeclarativeGenerator(BaseGenerator):
@@ -27,6 +33,14 @@ class SparkDeclarativeGenerator(BaseGenerator):
         for nhlink in model.nhlinks.values():
             result.add_file(
                 f"links/nhlink_{nhlink.name}.py", self._generate_nhlink(nhlink)
+            )
+        for bridge in model.bridges.values():
+            result.add_file(
+                f"views/bridge_{bridge.name}.py", self._generate_bridge(bridge)
+            )
+        for pit in model.pits.values():
+            result.add_file(
+                f"views/pit_{pit.name}.py", self._generate_pit(pit)
             )
         return result
 
@@ -168,4 +182,63 @@ class SparkDeclarativeGenerator(BaseGenerator):
             f'    sequence_by=F.col("load_ts"),\n'
             f"    stored_as_scd_type=1,\n"
             f")\n"
+        )
+
+    def _generate_bridge(self, bridge: Bridge) -> str:
+        view_name = f"bridge_{bridge.name}"
+        path = bridge.path
+        path_str = " -> ".join(path)
+
+        # Build join chain code lines
+        join_lines = ""
+        for i in range(1, len(path), 2):
+            link_name = path[i]
+            next_hub = path[i + 1]
+            prev_hub = path[i - 1]
+            join_lines += (
+                f'    link_df = dlt.read("{link_name}")\n'
+                f'    hub_df = dlt.read("{next_hub}")\n'
+                f'    df = df.join(link_df, df["{prev_hub}_hk"] == link_df["{prev_hub}_hk"])\n'
+                f'    df = df.join(hub_df, link_df["{next_hub}_hk"] == hub_df["{next_hub}_hk"])\n'
+            )
+
+        return (
+            f"{_IMPORTS}\n\n"
+            f"@dlt.view(\n"
+            f'    name="{view_name}",\n'
+            f'    comment="Bridge: {bridge.name}"\n'
+            f")\n"
+            f"def {view_name}():\n"
+            f'    """Bridge view traversing: {path_str}."""\n'
+            f'    df = dlt.read("{path[0]}")\n'
+            f"{join_lines}"
+            f"    return df\n"
+        )
+
+    def _generate_pit(self, pit: Pit) -> str:
+        view_name = f"pit_{pit.name}"
+
+        # Build satellite join lines
+        sat_lines = ""
+        for sat_ref in pit.tracked_satellites:
+            sat_lines += (
+                f'    sat_df = dlt.read("{sat_ref}")\n'
+                f'    w = Window.partitionBy("{pit.anchor_ref}_hk")'
+                f'.orderBy(F.col("load_ts").desc())\n'
+                f'    sat_latest = sat_df.withColumn("_rn", F.row_number().over(w))'
+                f'.filter(F.col("_rn") == 1).drop("_rn")\n'
+                f'    df = df.join(sat_latest, "{pit.anchor_ref}_hk", "left")\n'
+            )
+
+        return (
+            f"{_IMPORTS_VIEW}\n\n"
+            f"@dlt.view(\n"
+            f'    name="{view_name}",\n'
+            f'    comment="PIT: {pit.name} (anchor: {pit.anchor_ref})"\n'
+            f")\n"
+            f"def {view_name}():\n"
+            f'    """PIT view anchored on {pit.anchor_ref}."""\n'
+            f'    df = dlt.read("{pit.anchor_ref}")\n'
+            f"{sat_lines}"
+            f"    return df\n"
         )
