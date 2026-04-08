@@ -122,3 +122,84 @@ def test_data_vault_model_has_nhsats_nhlinks():
     )
     assert "n.S" in model.nhsats
     assert "n.L" in model.nhlinks
+
+
+# --- Resolver tests for nhsat / nhlink ---
+
+
+def test_resolve_nhsat():
+    """Parsed nhsat declaration appears in model.nhsats with correct fields."""
+    src = (
+        "namespace test\n"
+        "hub Customer { business_key id : int }\n"
+        "nhsat CurrentStatus of Customer { status : string }"
+    )
+    module = parse(src)
+    model = resolve([module])
+    assert "test.CurrentStatus" in model.nhsats
+    nhsat = model.nhsats["test.CurrentStatus"]
+    assert nhsat.parent_ref == "Customer"
+    assert nhsat.columns[0].name == "status"
+
+
+def test_resolve_nhlink():
+    """Parsed nhlink declaration appears in model.nhlinks with correct fields."""
+    src = (
+        "namespace test\n"
+        "hub A { business_key id : int }\n"
+        "hub B { business_key id : int }\n"
+        "nhlink AB { references A, B }"
+    )
+    module = parse(src)
+    model = resolve([module])
+    assert "test.AB" in model.nhlinks
+    assert len(model.nhlinks["test.AB"].hub_references) == 2
+
+
+def test_nhsat_invalid_parent_raises():
+    """NhSat with parent_ref pointing to non-existent entity raises ResolverErrors."""
+    src = "namespace test\nnhsat Bad of NonExistent { x : string }"
+    module = parse(src)
+    with pytest.raises(ResolverErrors, match="unknown parent"):
+        resolve([module])
+
+
+def test_nhsat_parent_ref_to_link_valid():
+    """NhSat with parent_ref pointing to a link resolves without error."""
+    src = (
+        "namespace test\n"
+        "hub A { business_key id : int }\n"
+        "hub B { business_key id : int }\n"
+        "link AB { references A, B }\n"
+        "nhsat LinkStatus of AB { active : boolean }"
+    )
+    module = parse(src)
+    model = resolve([module])
+    assert "test.LinkStatus" in model.nhsats
+
+
+def test_duplicate_nhsat_raises():
+    """Duplicate nhsat qualified name raises ResolverErrors."""
+    src = (
+        "namespace test\n"
+        "hub Customer { business_key id : int }\n"
+        "nhsat CurrentStatus of Customer { status : string }"
+    )
+    mod1 = parse(src)
+    mod2 = parse(src)
+    with pytest.raises(ResolverErrors, match="Duplicate nhsat"):
+        resolve([mod1, mod2])
+
+
+def test_duplicate_nhlink_raises():
+    """Duplicate nhlink qualified name raises ResolverErrors."""
+    src = (
+        "namespace test\n"
+        "hub A { business_key id : int }\n"
+        "hub B { business_key id : int }\n"
+        "nhlink AB { references A, B }"
+    )
+    mod1 = parse(src)
+    mod2 = parse(src)
+    with pytest.raises(ResolverErrors, match="Duplicate nhlink"):
+        resolve([mod1, mod2])
