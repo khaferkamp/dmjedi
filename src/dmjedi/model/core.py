@@ -125,6 +125,13 @@ class Bridge(BaseModel):
     namespace: str = ""
     path: list[str] = []
 
+    @model_validator(mode="after")
+    def _check_min_path(self) -> "Bridge":
+        if 0 < len(self.path) < 3:
+            msg = f"Bridge '{self.name}' path must have at least 3 elements (Hub -> Link -> Hub)"
+            raise ValueError(msg)
+        return self
+
     @property
     def qualified_name(self) -> str:
         return f"{self.namespace}.{self.name}" if self.namespace else self.name
