@@ -3,7 +3,17 @@
 from dataclasses import dataclass
 
 from dmjedi.lang.ast import DVMLModule
-from dmjedi.model.core import Column, DataVaultModel, Hub, Link, NhLink, NhSat, Satellite
+from dmjedi.model.core import (
+    Column,
+    DataVaultModel,
+    EffSat,
+    Hub,
+    Link,
+    NhLink,
+    NhSat,
+    SamLink,
+    Satellite,
+)
 
 
 @dataclass
@@ -155,6 +165,68 @@ def resolve(modules: list[DVMLModule]) -> DataVaultModel:
             else:
                 model.nhlinks[qname] = nhlink
 
+        for effsat_decl in module.effsats:
+            effsat = EffSat(
+                name=effsat_decl.name,
+                namespace=ns,
+                parent_ref=effsat_decl.parent_ref,
+                columns=[
+                    Column(name=f.name, data_type=f.data_type) for f in effsat_decl.fields
+                ],
+            )
+            qname = effsat.qualified_name
+            if qname in model.effsats:
+                errors.append(
+                    ResolverError(
+                        message=(
+                            f"Duplicate effsat '{qname}' redefined"
+                            f" in {module.source_file or '<string>'}:{effsat_decl.loc.line}"
+                        ),
+                        source_file=module.source_file,
+                        line=effsat_decl.loc.line,
+                    )
+                )
+            else:
+                model.effsats[qname] = effsat
+
+        for samlink_decl in module.samlinks:
+            if not samlink_decl.master_ref or not samlink_decl.duplicate_ref:
+                errors.append(
+                    ResolverError(
+                        message=(
+                            f"SamLink '{samlink_decl.name}' missing master or duplicate"
+                            f" reference in"
+                            f" {module.source_file or '<string>'}:{samlink_decl.loc.line}"
+                        ),
+                        source_file=module.source_file,
+                        line=samlink_decl.loc.line,
+                    )
+                )
+                continue
+            samlink = SamLink(
+                name=samlink_decl.name,
+                namespace=ns,
+                master_ref=samlink_decl.master_ref,
+                duplicate_ref=samlink_decl.duplicate_ref,
+                columns=[
+                    Column(name=f.name, data_type=f.data_type) for f in samlink_decl.fields
+                ],
+            )
+            qname = samlink.qualified_name
+            if qname in model.samlinks:
+                errors.append(
+                    ResolverError(
+                        message=(
+                            f"Duplicate samlink '{qname}' redefined"
+                            f" in {module.source_file or '<string>'}:{samlink_decl.loc.line}"
+                        ),
+                        source_file=module.source_file,
+                        line=samlink_decl.loc.line,
+                    )
+                )
+            else:
+                model.samlinks[qname] = samlink
+
     # Post-resolution validation: satellite parent refs
     for sat in model.satellites.values():
         ref = sat.parent_ref
@@ -188,6 +260,25 @@ def resolve(modules: list[DVMLModule]) -> DataVaultModel:
                 ResolverError(
                     message=(
                         f"NhSat '{nhsat.qualified_name}'"
+                        f" references unknown parent '{ref}'"
+                    ),
+                )
+            )
+
+    # Post-resolution validation: effsat parent refs
+    for effsat in model.effsats.values():
+        ref = effsat.parent_ref
+        ns_ref = f"{effsat.namespace}.{ref}" if effsat.namespace else ref
+        if (
+            ref not in model.hubs
+            and ref not in model.links
+            and ns_ref not in model.hubs
+            and ns_ref not in model.links
+        ):
+            errors.append(
+                ResolverError(
+                    message=(
+                        f"EffSat '{effsat.qualified_name}'"
                         f" references unknown parent '{ref}'"
                     ),
                 )
