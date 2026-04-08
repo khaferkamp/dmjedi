@@ -179,7 +179,7 @@ def test_sql_type_mapping_spark():
 
 def test_sql_type_mapping_unknown_passthrough():
     """Unknown DVML types are passed through uppercased."""
-    assert map_type("binary") == "BINARY"
+    assert map_type("blob") == "BLOB"
     assert map_type("CustomType") == "CUSTOMTYPE"
 
 
@@ -262,3 +262,20 @@ def test_spark_link_no_extra_columns():
     assert "import dlt" in code
     lines = [ln.strip() for ln in code.splitlines()]
     assert "pass" not in lines
+
+
+def test_spark_satellite_column_type_mapping():
+    """Verify Spark generator uses map_pyspark_type for column types (end-to-end)."""
+    model = DataVaultModel(
+        hubs={"ns.TestHub": Hub(name="TestHub", namespace="ns", business_keys=[Column(name="id", data_type="int")])},
+        satellites={"ns.TestSat": Satellite(
+            name="TestSat", namespace="ns", parent_ref="TestHub",
+            columns=[Column(name="amount", data_type="bigint")]
+        )},
+        links={},
+    )
+    gen = registry.get("spark-declarative")
+    result = gen.generate(model)
+    sat_code = result.files["satellites/TestSat.py"]
+    assert "LongType()" in sat_code, "bigint column should map to LongType() in Spark output"
+    assert ".cast(" in sat_code, "typed columns should use .cast() in Spark output"
