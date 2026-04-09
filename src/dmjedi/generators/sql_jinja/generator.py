@@ -42,4 +42,40 @@ class SqlJinjaGenerator(BaseGenerator):
         for link in model.links.values():
             result.add_file(f"links/{link.name}.sql", link_tpl.render(link=link))
 
+        nhsat_tpl = env.get_template("nhsat.sql.j2")
+        for nhsat in model.nhsats.values():
+            result.add_file(
+                f"satellites/nhsat_{nhsat.name}.sql", nhsat_tpl.render(nhsat=nhsat)
+            )
+
+        nhlink_tpl = env.get_template("nhlink.sql.j2")
+        for nhlink in model.nhlinks.values():
+            result.add_file(
+                f"links/nhlink_{nhlink.name}.sql", nhlink_tpl.render(nhlink=nhlink)
+            )
+
+        bridge_tpl = env.get_template("bridge.sql.j2")
+        for bridge in model.bridges.values():
+            result.add_file(
+                f"views/bridge_{bridge.name}.sql", bridge_tpl.render(bridge=bridge)
+            )
+
+        pit_tpl = env.get_template("pit.sql.j2")
+        for pit in model.pits.values():
+            result.add_file(
+                f"views/pit_{pit.name}.sql", pit_tpl.render(pit=pit)
+            )
+
+        effsat_tpl = env.get_template("effsat.sql.j2")
+        for effsat in model.effsats.values():
+            result.add_file(
+                f"satellites/effsat_{effsat.name}.sql", effsat_tpl.render(effsat=effsat)
+            )
+
+        samlink_tpl = env.get_template("samlink.sql.j2")
+        for samlink in model.samlinks.values():
+            result.add_file(
+                f"links/samlink_{samlink.name}.sql", samlink_tpl.render(samlink=samlink)
+            )
+
         return result

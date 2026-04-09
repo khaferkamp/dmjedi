@@ -6,6 +6,8 @@ from lark.exceptions import UnexpectedCharacters, UnexpectedInput, UnexpectedTok
 from rich.console import Console
 
 from dmjedi.lang.linter import LintDiagnostic, Severity
+from dmjedi.lang.parser import DVMLParseError
+from dmjedi.lang.parser import ParseError as ParseErrorData
 
 _SEVERITY_ICONS: dict[Severity, str] = {
     Severity.ERROR: "[red]E[/red]",
@@ -24,28 +26,36 @@ def format_lint_diagnostic(diag: LintDiagnostic) -> str:
     return f"{icon} {loc.file}:{loc.line}:{loc.column} {diag.message} [{diag.rule}]"
 
 
-def format_parse_error(err: UnexpectedInput, source_file: str) -> str:
-    """Format a Lark parse error for Rich markup output.
+def format_parse_error(err: UnexpectedInput | DVMLParseError, source_file: str = "") -> str:
+    """Format a parse error for Rich markup output.
 
-    Handles both :class:`UnexpectedToken` and :class:`UnexpectedCharacters`.
+    Accepts either a :class:`DVMLParseError` (structured, preferred) or a raw
+    :class:`~lark.exceptions.UnexpectedInput` (legacy path).
+
+    Format: ``{file}:{line}:{col}: error: {hint}``
     """
-    line: int = getattr(err, "line", 0)
-    col: int = getattr(err, "column", 0)
-
-    if isinstance(err, UnexpectedToken):
-        expected = getattr(err, "expected", None)
-        if expected:
-            tokens = ", ".join(sorted(expected))
-            msg = f"Syntax error: unexpected token. Expected one of: {tokens}"
-        else:
-            msg = f"Syntax error: unexpected token '{err.token}'"
-    elif isinstance(err, UnexpectedCharacters):
-        char = getattr(err, "char", "?")
-        msg = f"Syntax error: unexpected character '{char}'"
+    if isinstance(err, DVMLParseError):
+        pe = err.error
     else:
-        msg = f"Syntax error: {err}"
+        # Legacy path — build ParseError from raw Lark exception
+        line: int = max(0, getattr(err, "line", 0))
+        col: int = max(0, getattr(err, "column", 0))
+        if isinstance(err, UnexpectedToken):
+            expected = getattr(err, "expected", None)
+            if expected:
+                tokens = ", ".join(sorted(expected))
+                hint = f"Syntax error: unexpected token. Expected one of: {tokens}"
+            else:
+                hint = f"Syntax error: unexpected token '{err.token}'"
+        elif isinstance(err, UnexpectedCharacters):
+            char = getattr(err, "char", "?")
+            hint = f"Syntax error: unexpected character '{char}'"
+        else:
+            hint = f"Syntax error: {err}"
+        pe = ParseErrorData(file=source_file, line=line, column=col, hint=hint)
 
-    return f"[red]E[/red] {source_file}:{line}:{col} {msg}"
+    loc = f"{pe.file}:{pe.line}:{pe.column}" if pe.line > 0 else f"{pe.file}:end-of-file"
+    return f"[red]{loc}: error:[/red] {pe.hint}"
 
 
 def print_diagnostics(diagnostics: list[LintDiagnostic], console: Console) -> None:

@@ -43,7 +43,7 @@ def test_validate_syntax_error(tmp_path: Path) -> None:
     bad_dv.write_text("this is not valid dvml !!!")
     result = runner.invoke(app, ["validate", str(bad_dv)])
     assert result.exit_code == 1
-    assert "Syntax error" in result.output
+    assert "error:" in result.output
 
 
 # --- generate command ---
@@ -91,6 +91,25 @@ def test_docs_valid(tmp_path: Path) -> None:
     assert "Customer" in content
 
 
+def test_docs_exits_on_model_aware_error(tmp_path: Path) -> None:
+    """docs command exits with code 1 when model-aware lint finds errors (effsat references hub)."""
+    dv_file = tmp_path / "bad.dv"
+    dv_file.write_text(
+        "namespace test\n"
+        "hub Customer { business_key id: int }\n"
+        "effsat CustomerStatus of Customer { }\n"
+    )
+    result = runner.invoke(app, ["docs", str(dv_file), "--output", str(tmp_path / "out")])
+    assert result.exit_code == 1
+
+
+def test_docs_passes_on_warnings_only(tmp_path: Path) -> None:
+    """docs command exits with code 0 when model-aware lint produces only warnings."""
+    result = runner.invoke(app, ["docs", "examples/sales-domain.dv", "--output", str(tmp_path)])
+    assert result.exit_code == 0
+    assert (tmp_path / "model.md").exists()
+
+
 # --- error formatting ---
 
 
@@ -119,17 +138,14 @@ def test_format_lint_diagnostic_warning() -> None:
 
 
 def test_format_parse_error() -> None:
-    from dmjedi.lang.parser import parse
+    from dmjedi.lang.parser import DVMLParseError, parse
 
     try:
-        parse("this is not valid dvml !!!")
-    except Exception as err:
-        from lark.exceptions import UnexpectedInput
-
-        assert isinstance(err, UnexpectedInput)
-        formatted = format_parse_error(err, "bad.dv")
+        parse("this is not valid dvml !!!", source_file="bad.dv")
+    except DVMLParseError as err:
+        formatted = format_parse_error(err)
         assert "bad.dv:" in formatted
-        assert "Syntax error" in formatted
+        assert "error:" in formatted
 
 
 # --- directory and import integration ---
@@ -185,3 +201,81 @@ def test_validate_with_imports(fixtures_dir: Path) -> None:
     if main_dv.exists():
         result = runner.invoke(app, ["validate", str(main_dv)])
         assert result.exit_code == 0
+
+
+# --- --dialect flag tests ---
+
+
+FIXTURE_DV = str(Path(__file__).parent / "fixtures" / "sales.dv")
+
+
+def test_cli_dialect_in_help() -> None:
+    """generate --help shows --dialect option with default 'default'."""
+    result = runner.invoke(app, ["generate", "--help"])
+    assert result.exit_code == 0
+    assert "--dialect" in result.output
+    assert "default" in result.output
+
+
+def test_cli_dialect_sql_jinja_postgres(tmp_path: Path) -> None:
+    """--dialect postgres produces postgres-specific type mappings in SQL output."""
+    result = runner.invoke(
+        app,
+        [
+            "generate",
+            FIXTURE_DV,
+            "--target",
+            "sql-jinja",
+            "--dialect",
+            "postgres",
+            "--output",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 0
+    # Check that at least one hub SQL file was generated
+    hub_files = list((tmp_path / "hubs").glob("*.sql"))
+    assert len(hub_files) > 0
+    content = hub_files[0].read_text()
+    # Postgres dialect maps 'int' to 'INTEGER' (not BIGINT or NUMBER)
+    assert "INTEGER" in content or "TEXT" in content
+
+
+def test_cli_dialect_non_sql_jinja_warns(tmp_path: Path) -> None:
+    """--dialect with spark-declarative target emits a warning and exits 0."""
+    result = runner.invoke(
+        app,
+        [
+            "generate",
+            FIXTURE_DV,
+            "--target",
+            "spark-declarative",
+            "--dialect",
+            "postgres",
+            "--output",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 0
+    # Warning must be present in combined output
+    combined = result.output + (result.stderr if hasattr(result, "stderr") and result.stderr else "")
+    assert "Warning" in combined or "warning" in combined.lower()
+    assert "dialect" in combined.lower()
+
+
+def test_cli_dialect_invalid_value(tmp_path: Path) -> None:
+    """--dialect with an invalid value is rejected with exit code 1."""
+    result = runner.invoke(
+        app,
+        [
+            "generate",
+            FIXTURE_DV,
+            "--target",
+            "sql-jinja",
+            "--dialect",
+            "invalid_dialect",
+            "--output",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code != 0

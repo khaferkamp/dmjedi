@@ -1,0 +1,24 @@
+namespace test
+
+hub Customer {
+    business_key customer_id : int
+}
+
+hub Product {
+    business_key product_id : int
+}
+
+link CustomerOrder {
+    references Customer, Product
+}
+
+effsat OrderValidity of CustomerOrder {
+    start_date : timestamp
+    end_date : timestamp
+}
+
+samlink CustomerMatch {
+    master Customer
+    duplicate Customer
+    confidence_score : decimal
+}

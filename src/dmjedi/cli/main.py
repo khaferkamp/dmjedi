@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
-from lark.exceptions import UnexpectedInput
 from rich.console import Console
 
 from dmjedi.cli.errors import format_parse_error, print_diagnostics
@@ -15,7 +14,7 @@ from dmjedi.lang.ast import DVMLModule
 from dmjedi.lang.discovery import discover_dv_files
 from dmjedi.lang.imports import CircularImportError, resolve_imports
 from dmjedi.lang.linter import LintDiagnostic, Severity, lint
-from dmjedi.lang.parser import parse_file
+from dmjedi.lang.parser import DVMLParseError, parse_file
 from dmjedi.model.resolver import ResolverErrors, resolve
 
 app = typer.Typer(
@@ -46,14 +45,27 @@ def validate(
 
     # Also run resolver to catch cross-module errors
     try:
-        resolve(modules)
+        model = resolve(modules)
     except ResolverErrors as e:
         for err in e.errors:
             loc = f"{err.source_file}:{err.line} " if err.source_file else ""
             console.print(f"[red]E[/red] {loc}{err.message}")
         raise typer.Exit(code=1) from None
 
-    if not all_diagnostics:
+    # Post-resolve lint for model-aware rules (LINT-01 effsat parent check)
+    post_resolve_diags: list[LintDiagnostic] = []
+    for module in modules:
+        post_resolve_diags.extend(lint(module, model=model))
+    model_aware_diags = [
+        d for d in post_resolve_diags if d.rule in ("effsat-parent-must-be-link",)
+    ]
+    if model_aware_diags:
+        print_diagnostics(model_aware_diags, console)
+    model_aware_error_count = sum(1 for d in model_aware_diags if d.severity == Severity.ERROR)
+    if model_aware_error_count > 0:
+        raise typer.Exit(code=1)
+
+    if not all_diagnostics and not model_aware_diags:
         console.print("[green]All files valid.[/green]")
 
 
@@ -62,9 +74,24 @@ def generate(
     paths: list[Path] = typer.Argument(..., help="DVML files or directories"),
     target: str = typer.Option("spark-declarative", "--target", "-t", help="Generator target"),
     output: Path = typer.Option("output", "--output", "-o", help="Output directory"),
+    dialect: str = typer.Option(
+        "default",
+        "--dialect",
+        help="SQL dialect (default, postgres, spark). Only applies to --target sql-jinja.",
+    ),
 ) -> None:
     """Generate pipeline code from DVML models."""
     console = Console(stderr=True)
+
+    # Validate dialect against allowlist (T-11-05 mitigation)
+    valid_dialects = {"default", "postgres", "spark"}
+    if dialect not in valid_dialects:
+        console.print(
+            f"[red]Error:[/red] Invalid dialect '{dialect}'. "
+            f"Choose from: {', '.join(sorted(valid_dialects))}"
+        )
+        raise typer.Exit(code=1)
+
     modules = _parse_all(paths, console)
 
     # Lint all modules
@@ -87,12 +114,40 @@ def generate(
             console.print(f"[red]E[/red] {loc}{err.message}")
         raise typer.Exit(code=1) from None
 
-    # Generate
-    try:
-        gen = registry.get(target)
-    except KeyError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(code=1) from None
+    # Post-resolve lint for model-aware rules (LINT-01 effsat parent check)
+    post_resolve_diags: list[LintDiagnostic] = []
+    for module in modules:
+        post_resolve_diags.extend(lint(module, model=model))
+    model_aware_diags = [
+        d for d in post_resolve_diags if d.rule in ("effsat-parent-must-be-link",)
+    ]
+    if model_aware_diags:
+        print_diagnostics(model_aware_diags, console)
+    model_aware_error_count = sum(1 for d in model_aware_diags if d.severity == Severity.ERROR)
+    if model_aware_error_count > 0:
+        raise typer.Exit(code=1)
+
+    # Warn if --dialect used with non-sql-jinja target (per D-15)
+    if dialect != "default" and target != "sql-jinja":
+        console.print(
+            "[yellow]Warning:[/yellow] --dialect is only used with --target sql-jinja; ignoring."
+        )
+
+    # Generate — bypass registry for sql-jinja to pass dialect
+    # (registry returns the default-dialect instance; instantiate directly to honour --dialect)
+    from dmjedi.generators.base import BaseGenerator
+
+    gen: BaseGenerator
+    if target == "sql-jinja":
+        from dmjedi.generators.sql_jinja.generator import SqlJinjaGenerator
+
+        gen = SqlJinjaGenerator(dialect=dialect)
+    else:
+        try:
+            gen = registry.get(target)
+        except KeyError as e:
+            console.print(f"[red]Error:[/red] {e}")
+            raise typer.Exit(code=1) from None
 
     result = gen.generate(model)
     written = result.write(output)
@@ -128,6 +183,19 @@ def docs(
             console.print(f"[red]E[/red] {loc}{err.message}")
         raise typer.Exit(code=1) from None
 
+    # Post-resolve lint for model-aware rules (LINT-01 effsat parent check)
+    post_resolve_diags: list[LintDiagnostic] = []
+    for module in modules:
+        post_resolve_diags.extend(lint(module, model=model))
+    model_aware_diags = [
+        d for d in post_resolve_diags if d.rule in ("effsat-parent-must-be-link",)
+    ]
+    if model_aware_diags:
+        print_diagnostics(model_aware_diags, console)
+    model_aware_error_count = sum(1 for d in model_aware_diags if d.severity == Severity.ERROR)
+    if model_aware_error_count > 0:
+        raise typer.Exit(code=1)
+
     markdown = generate_markdown(model)
 
     output.mkdir(parents=True, exist_ok=True)
@@ -139,8 +207,9 @@ def docs(
 @app.command()
 def lsp() -> None:
     """Start the DVML Language Server."""
-    typer.echo("Starting DVML Language Server...")
-    # TODO: launch pygls server
+    console = Console(stderr=True)
+    console.print("[red]Error:[/red] LSP server is not yet implemented.")
+    raise typer.Exit(code=1)
 
 
 def _parse_all(paths: list[Path], console: Console) -> list[DVMLModule]:
@@ -161,8 +230,8 @@ def _parse_all(paths: list[Path], console: Console) -> list[DVMLModule]:
     for path in dv_files:
         try:
             modules.append(parse_file(path))
-        except UnexpectedInput as e:
-            console.print(format_parse_error(e, str(path)))
+        except DVMLParseError as e:
+            console.print(format_parse_error(e))
             raise typer.Exit(code=1) from None
 
     # Step 3: Resolve imports
