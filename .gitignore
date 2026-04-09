@@ -44,4 +44,4 @@ output/
 .claude/
 
 # GSD planning artifacts
-.planning/
+#.planning/
