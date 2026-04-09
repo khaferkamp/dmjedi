@@ -58,9 +58,107 @@ class Link(BaseModel):
         return f"{self.namespace}.{self.name}" if self.namespace else self.name
 
 
+class NhSat(BaseModel):
+    """A resolved non-historized satellite (current-state-only)."""
+
+    name: str
+    namespace: str = ""
+    parent_ref: str
+    columns: list[Column] = []
+
+    @property
+    def qualified_name(self) -> str:
+        return f"{self.namespace}.{self.name}" if self.namespace else self.name
+
+
+class NhLink(BaseModel):
+    """A resolved non-historized link (current-state-only)."""
+
+    name: str
+    namespace: str = ""
+    hub_references: list[str] = []
+    columns: list[Column] = []
+
+    @model_validator(mode="after")
+    def _check_min_refs(self) -> "NhLink":
+        if len(self.hub_references) < 2:
+            msg = f"NhLink '{self.name}' must reference at least 2 hubs"
+            raise ValueError(msg)
+        return self
+
+    @property
+    def qualified_name(self) -> str:
+        return f"{self.namespace}.{self.name}" if self.namespace else self.name
+
+
+class EffSat(BaseModel):
+    """A resolved effectivity satellite (temporal link validity)."""
+
+    name: str
+    namespace: str = ""
+    parent_ref: str
+    columns: list[Column] = []
+
+    @property
+    def qualified_name(self) -> str:
+        return f"{self.namespace}.{self.name}" if self.namespace else self.name
+
+
+class SamLink(BaseModel):
+    """A resolved same-as link (master/duplicate cross-source matching)."""
+
+    name: str
+    namespace: str = ""
+    master_ref: str
+    duplicate_ref: str
+    columns: list[Column] = []
+
+    @property
+    def qualified_name(self) -> str:
+        return f"{self.namespace}.{self.name}" if self.namespace else self.name
+
+
+class Bridge(BaseModel):
+    """A resolved bridge table (query-assist cross-hub traversal)."""
+
+    name: str
+    namespace: str = ""
+    path: list[str] = []
+
+    @model_validator(mode="after")
+    def _check_min_path(self) -> "Bridge":
+        if 0 < len(self.path) < 3:
+            msg = f"Bridge '{self.name}' path must have at least 3 elements (Hub -> Link -> Hub)"
+            raise ValueError(msg)
+        return self
+
+    @property
+    def qualified_name(self) -> str:
+        return f"{self.namespace}.{self.name}" if self.namespace else self.name
+
+
+class Pit(BaseModel):
+    """A resolved point-in-time table (query-assist snapshot)."""
+
+    name: str
+    namespace: str = ""
+    anchor_ref: str
+    tracked_satellites: list[str] = []
+
+    @property
+    def qualified_name(self) -> str:
+        return f"{self.namespace}.{self.name}" if self.namespace else self.name
+
+
 class DataVaultModel(BaseModel):
     """A complete, resolved Data Vault 2.1 model built from one or more DVML modules."""
 
     hubs: dict[str, Hub] = {}
     satellites: dict[str, Satellite] = {}
     links: dict[str, Link] = {}
+    nhsats: dict[str, NhSat] = {}
+    nhlinks: dict[str, NhLink] = {}
+    effsats: dict[str, EffSat] = {}
+    samlinks: dict[str, SamLink] = {}
+    bridges: dict[str, Bridge] = {}
+    pits: dict[str, Pit] = {}

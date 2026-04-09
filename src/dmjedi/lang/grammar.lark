@@ -29,6 +29,12 @@ statement: namespace_decl
          | hub_decl
          | satellite_decl
          | link_decl
+         | nhsat_decl
+         | nhlink_decl
+         | effsat_decl
+         | samlink_decl
+         | bridge_decl
+         | pit_decl
          | import_decl
 
 // --- Imports ---
@@ -55,16 +61,58 @@ link_member: references_decl | field_decl
 
 references_decl: "references" qualified_ref ("," qualified_ref)*
 
+// --- Non-Historized Satellite ---
+nhsat_decl: "nhsat" IDENTIFIER "of" qualified_ref "{" nhsat_body "}"
+nhsat_body: field_decl*
+
+// --- Non-Historized Link ---
+nhlink_decl: "nhlink" IDENTIFIER "{" nhlink_body "}"
+nhlink_body: nhlink_member*
+nhlink_member: references_decl | field_decl
+
+// --- Effectivity Satellite ---
+effsat_decl: "effsat" IDENTIFIER "of" qualified_ref "{" effsat_body "}"
+effsat_body: field_decl*
+
+// --- Same-As Link ---
+samlink_decl: "samlink" IDENTIFIER "{" samlink_body "}"
+samlink_body: samlink_member*
+samlink_member: master_ref | duplicate_ref | field_decl
+master_ref: "master" qualified_ref
+duplicate_ref: "duplicate" qualified_ref
+
+// --- Bridge ---
+bridge_decl: "bridge" IDENTIFIER "{" bridge_body "}"
+bridge_body: bridge_member*
+bridge_member: path_decl | field_decl
+path_decl: "path" path_chain
+path_chain: qualified_ref ("->" qualified_ref)+
+
+// --- Point-in-Time ---
+pit_decl: "pit" IDENTIFIER "{" pit_body "}"
+pit_body: pit_member*
+pit_member: pit_of | pit_tracks | field_decl
+pit_of: "of" qualified_ref
+pit_tracks: "tracks" qualified_ref ("," qualified_ref)*
+
 // --- Shared ---
 field_decl: IDENTIFIER ":" data_type
 
-data_type: "int"       -> type_int
+data_type: type_name ("(" type_params ")")?
+
+type_name: "int"       -> type_int
          | "string"    -> type_string
          | "decimal"   -> type_decimal
          | "date"      -> type_date
          | "timestamp" -> type_timestamp
          | "boolean"   -> type_boolean
          | "json"      -> type_json
+         | "bigint"    -> type_bigint
+         | "float"     -> type_float
+         | "varchar"   -> type_varchar
+         | "binary"    -> type_binary
+
+type_params: /[^)]+/
 
 qualified_ref: IDENTIFIER ("." IDENTIFIER)*
 

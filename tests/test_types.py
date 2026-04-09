@@ -1,0 +1,77 @@
+"""Tests for the shared DVML type mapping module (model/types.py)."""
+
+from dmjedi.model.types import SUPPORTED_DIALECTS, map_pyspark_type, map_type
+
+
+def test_map_type_bigint_all_dialects():
+    assert map_type("bigint", "default") == "BIGINT"
+    assert map_type("bigint", "postgres") == "BIGINT"
+    assert map_type("bigint", "spark") == "BIGINT"
+
+
+def test_map_type_float_all_dialects():
+    assert map_type("float", "default") == "FLOAT"
+    assert map_type("float", "postgres") == "DOUBLE PRECISION"
+    assert map_type("float", "spark") == "FLOAT"
+
+
+def test_map_type_varchar_default_bare():
+    """D-16: bare varchar defaults to VARCHAR(255) (or dialect-specific)."""
+    assert map_type("varchar", "default") == "VARCHAR(255)"
+    assert map_type("varchar", "postgres") == "VARCHAR(255)"
+    assert map_type("varchar", "spark") == "STRING"
+
+
+def test_map_type_varchar_parameterized():
+    """D-13: parameter-aware mapping for varchar(100)."""
+    assert map_type("varchar(100)", "default") == "VARCHAR(100)"
+    assert map_type("varchar(100)", "postgres") == "VARCHAR(100)"
+    assert map_type("varchar(100)", "spark") == "STRING(100)"
+
+
+def test_map_type_decimal_parameterized():
+    """D-13: parameter-aware mapping for decimal(10,4)."""
+    assert map_type("decimal(10,4)", "default") == "DECIMAL(10,4)"
+
+
+def test_map_type_binary_all_dialects():
+    assert map_type("binary", "default") == "BINARY"
+    assert map_type("binary", "postgres") == "BYTEA"
+    assert map_type("binary", "spark") == "BINARY"
+
+
+def test_map_pyspark_type_new_types():
+    assert map_pyspark_type("bigint") == "LongType()"
+    assert map_pyspark_type("float") == "FloatType()"
+    assert map_pyspark_type("varchar") == "StringType()"
+    assert map_pyspark_type("binary") == "BinaryType()"
+
+
+def test_map_pyspark_type_parameterized_ignores_params():
+    """PySpark types ignore varchar parameters."""
+    assert map_pyspark_type("varchar(100)") == "StringType()"
+
+
+def test_map_pyspark_type_decimal_preserves_params():
+    """PySpark decimal preserves precision/scale."""
+    assert map_pyspark_type("decimal(10,4)") == "DecimalType(10,4)"
+
+
+def test_existing_types_unchanged():
+    """Regression: all 7 original types still map correctly."""
+    assert map_type("int") == "INT"
+    assert map_type("string") == "VARCHAR(255)"
+    assert map_type("decimal") == "DECIMAL(18,2)"
+    assert map_type("date") == "DATE"
+    assert map_type("timestamp") == "TIMESTAMP"
+    assert map_type("boolean") == "BOOLEAN"
+    assert map_type("json") == "JSON"
+    # Postgres
+    assert map_type("string", "postgres") == "TEXT"
+    assert map_type("json", "postgres") == "JSONB"
+    # Spark
+    assert map_type("string", "spark") == "STRING"
+
+
+def test_supported_dialects():
+    assert set(SUPPORTED_DIALECTS) == {"default", "postgres", "spark"}
