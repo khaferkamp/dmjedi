@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -14,7 +15,7 @@ _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 
 class SqlJinjaGenerator(BaseGenerator):
-    def __init__(self, dialect: str = "default") -> None:
+    def __init__(self, dialect: str = "default", **kwargs: Any) -> None:
         self._dialect = dialect
 
     @property
