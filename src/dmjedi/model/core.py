@@ -130,6 +130,9 @@ class Bridge(BaseModel):
         if 0 < len(self.path) < 3:
             msg = f"Bridge '{self.name}' path must have at least 3 elements (Hub -> Link -> Hub)"
             raise ValueError(msg)
+        if len(self.path) > 0 and len(self.path) % 2 == 0:
+            msg = f"Bridge '{self.name}' path must have odd length (Hub -> Link -> Hub pattern)"
+            raise ValueError(msg)
         return self
 
     @property
