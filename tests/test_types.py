@@ -74,4 +74,6 @@ def test_existing_types_unchanged():
 
 
 def test_supported_dialects():
-    assert set(SUPPORTED_DIALECTS) == {"default", "postgres", "spark"}
+    assert {"default", "postgres", "spark"}.issubset(set(SUPPORTED_DIALECTS))
+    assert "duckdb" in SUPPORTED_DIALECTS
+    assert "databricks" in SUPPORTED_DIALECTS
