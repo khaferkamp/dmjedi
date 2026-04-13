@@ -9,8 +9,20 @@ import re
 _PARAM_RE = re.compile(r"^(\w+)\(([^)]*)\)$")
 
 _TYPE_MAP: dict[str, dict[str, str]] = {
-    "int": {"default": "INT", "postgres": "INTEGER", "spark": "INT", "duckdb": "INTEGER", "databricks": "INT"},
-    "string": {"default": "VARCHAR(255)", "postgres": "TEXT", "spark": "STRING", "duckdb": "VARCHAR", "databricks": "STRING"},
+    "int": {
+        "default": "INT",
+        "postgres": "INTEGER",
+        "spark": "INT",
+        "duckdb": "INTEGER",
+        "databricks": "INT",
+    },
+    "string": {
+        "default": "VARCHAR(255)",
+        "postgres": "TEXT",
+        "spark": "STRING",
+        "duckdb": "VARCHAR",
+        "databricks": "STRING",
+    },
     "decimal": {
         "default": "DECIMAL(18,2)",
         "postgres": "NUMERIC(18,2)",
@@ -18,7 +30,13 @@ _TYPE_MAP: dict[str, dict[str, str]] = {
         "duckdb": "DECIMAL(18,2)",
         "databricks": "DECIMAL(18,2)",
     },
-    "date": {"default": "DATE", "postgres": "DATE", "spark": "DATE", "duckdb": "DATE", "databricks": "DATE"},
+    "date": {
+        "default": "DATE",
+        "postgres": "DATE",
+        "spark": "DATE",
+        "duckdb": "DATE",
+        "databricks": "DATE",
+    },
     "timestamp": {
         "default": "TIMESTAMP",
         "postgres": "TIMESTAMP",
@@ -26,12 +44,48 @@ _TYPE_MAP: dict[str, dict[str, str]] = {
         "duckdb": "TIMESTAMP",
         "databricks": "TIMESTAMP",
     },
-    "boolean": {"default": "BOOLEAN", "postgres": "BOOLEAN", "spark": "BOOLEAN", "duckdb": "BOOLEAN", "databricks": "BOOLEAN"},
-    "json": {"default": "JSON", "postgres": "JSONB", "spark": "STRING", "duckdb": "JSON", "databricks": "STRING"},
-    "bigint": {"default": "BIGINT", "postgres": "BIGINT", "spark": "BIGINT", "duckdb": "BIGINT", "databricks": "BIGINT"},
-    "float": {"default": "FLOAT", "postgres": "DOUBLE PRECISION", "spark": "FLOAT", "duckdb": "FLOAT", "databricks": "FLOAT"},
-    "varchar": {"default": "VARCHAR(255)", "postgres": "VARCHAR(255)", "spark": "STRING", "duckdb": "VARCHAR(255)", "databricks": "STRING"},
-    "binary": {"default": "BINARY", "postgres": "BYTEA", "spark": "BINARY", "duckdb": "BLOB", "databricks": "BINARY"},
+    "boolean": {
+        "default": "BOOLEAN",
+        "postgres": "BOOLEAN",
+        "spark": "BOOLEAN",
+        "duckdb": "BOOLEAN",
+        "databricks": "BOOLEAN",
+    },
+    "json": {
+        "default": "JSON",
+        "postgres": "JSONB",
+        "spark": "STRING",
+        "duckdb": "JSON",
+        "databricks": "STRING",
+    },
+    "bigint": {
+        "default": "BIGINT",
+        "postgres": "BIGINT",
+        "spark": "BIGINT",
+        "duckdb": "BIGINT",
+        "databricks": "BIGINT",
+    },
+    "float": {
+        "default": "FLOAT",
+        "postgres": "DOUBLE PRECISION",
+        "spark": "FLOAT",
+        "duckdb": "FLOAT",
+        "databricks": "FLOAT",
+    },
+    "varchar": {
+        "default": "VARCHAR(255)",
+        "postgres": "VARCHAR(255)",
+        "spark": "STRING",
+        "duckdb": "VARCHAR(255)",
+        "databricks": "STRING",
+    },
+    "binary": {
+        "default": "BINARY",
+        "postgres": "BYTEA",
+        "spark": "BINARY",
+        "duckdb": "BLOB",
+        "databricks": "BINARY",
+    },
     # System column types (D-03, D-04)
     # These map system column virtual types to SQL types per dialect.
     # Templates call map_type("hashkey") instead of hardcoding BINARY.
