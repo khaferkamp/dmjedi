@@ -1,5 +1,7 @@
 """Generator for Databricks Spark Declarative Pipelines (DLT)."""
 
+from typing import Any
+
 from dmjedi.generators.base import BaseGenerator, GeneratorResult
 from dmjedi.model.core import (
     Bridge,
@@ -25,6 +27,9 @@ _IMPORTS_VIEW = (
 
 
 class SparkDeclarativeGenerator(BaseGenerator):
+    def __init__(self, mode: str = "batch", **kwargs: Any) -> None:
+        self._mode = mode
+
     @property
     def name(self) -> str:
         return "spark-declarative"
