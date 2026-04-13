@@ -2,13 +2,14 @@
 
 import re
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
 from dmjedi.generators import registry
 from dmjedi.generators.base import BaseGenerator
-from dmjedi.generators.sql_jinja.generator import SqlJinjaGenerator
 from dmjedi.generators.spark_declarative.generator import SparkDeclarativeGenerator
+from dmjedi.generators.sql_jinja.generator import SqlJinjaGenerator
 
 
 class TestRegistryFactoryPattern:
@@ -56,7 +57,7 @@ class TestTemplateNoHardcodedTypes:
 
     TEMPLATES_DIR = Path("src/dmjedi/generators/sql_jinja/templates")
     # Templates that declare DDL columns (CREATE TABLE with type declarations)
-    DDL_TEMPLATES = ["hub.sql.j2", "satellite.sql.j2", "link.sql.j2"]
+    DDL_TEMPLATES: ClassVar[list[str]] = ["hub.sql.j2", "satellite.sql.j2", "link.sql.j2"]
 
     def test_no_hardcoded_binary_in_ddl_templates(self):
         """DDL templates must not contain bare ' BINARY' type declarations."""
