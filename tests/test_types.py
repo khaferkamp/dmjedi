@@ -26,7 +26,7 @@ def test_map_type_varchar_parameterized():
     """D-13: parameter-aware mapping for varchar(100)."""
     assert map_type("varchar(100)", "default") == "VARCHAR(100)"
     assert map_type("varchar(100)", "postgres") == "VARCHAR(100)"
-    assert map_type("varchar(100)", "spark") == "STRING(100)"
+    assert map_type("varchar(100)", "spark") == "STRING"
 
 
 def test_map_type_decimal_parameterized():

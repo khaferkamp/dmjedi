@@ -98,6 +98,11 @@ def map_type(dvml_type: str, dialect: str = "default") -> str:
         entry = _TYPE_MAP.get(base)
         if entry:
             base_sql = entry.get(dialect, entry["default"])
+            # If the dialect type has no default params and the mapped name differs
+            # from the DVML base (e.g., varchar -> STRING for Spark), the target type
+            # does not accept parameters — drop them.
+            if "(" not in base_sql and base.upper() != base_sql.upper():
+                return base_sql
             # Strip default params from base_sql, apply user params
             base_sql_no_params = re.sub(r"\([^)]*\)", "", base_sql)
             return f"{base_sql_no_params}({params})"
