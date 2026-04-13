@@ -77,18 +77,19 @@ def generate(
     dialect: str = typer.Option(
         "default",
         "--dialect",
-        help="SQL dialect (default, postgres, spark). Only applies to --target sql-jinja.",
+        help="SQL dialect for type mapping. Only applies to --target sql-jinja.",
     ),
 ) -> None:
     """Generate pipeline code from DVML models."""
     console = Console(stderr=True)
 
-    # Validate dialect against allowlist (T-11-05 mitigation)
-    valid_dialects = {"default", "postgres", "spark"}
-    if dialect not in valid_dialects:
+    # Validate dialect against supported dialects from type mapping (D-08)
+    from dmjedi.model.types import SUPPORTED_DIALECTS
+
+    if dialect not in SUPPORTED_DIALECTS:
         console.print(
             f"[red]Error:[/red] Invalid dialect '{dialect}'. "
-            f"Choose from: {', '.join(sorted(valid_dialects))}"
+            f"Choose from: {', '.join(SUPPORTED_DIALECTS)}"
         )
         raise typer.Exit(code=1)
 
@@ -133,21 +134,12 @@ def generate(
             "[yellow]Warning:[/yellow] --dialect is only used with --target sql-jinja; ignoring."
         )
 
-    # Generate — bypass registry for sql-jinja to pass dialect
-    # (registry returns the default-dialect instance; instantiate directly to honour --dialect)
-    from dmjedi.generators.base import BaseGenerator
-
-    gen: BaseGenerator
-    if target == "sql-jinja":
-        from dmjedi.generators.sql_jinja.generator import SqlJinjaGenerator
-
-        gen = SqlJinjaGenerator(dialect=dialect)
-    else:
-        try:
-            gen = registry.get(target)
-        except KeyError as e:
-            console.print(f"[red]Error:[/red] {e}")
-            raise typer.Exit(code=1) from None
+    # Generate via factory pattern (D-07)
+    try:
+        gen = registry.get(target, dialect=dialect)
+    except KeyError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(code=1) from None
 
     result = gen.generate(model)
     written = result.write(output)
