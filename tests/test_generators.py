@@ -89,11 +89,11 @@ def test_sql_hub_output_valid():
     result = gen.generate(_sample_model())
     sql = result.files["hubs/Customer.sql"]
     _assert_valid_sql(sql)
-    assert "CREATE TABLE IF NOT EXISTS Customer" in sql
-    assert "Customer_hk BINARY NOT NULL" in sql
-    assert "load_ts TIMESTAMP NOT NULL" in sql
+    assert 'CREATE TABLE IF NOT EXISTS "Customer"' in sql
+    assert '"Customer_hk" CHAR(64) NOT NULL' in sql
+    assert '"load_ts" TIMESTAMP NOT NULL' in sql
     assert "record_source" in sql
-    assert "customer_id INT" in sql
+    assert '"customer_id" INT' in sql
 
 
 def test_sql_satellite_output_valid():
@@ -101,11 +101,11 @@ def test_sql_satellite_output_valid():
     result = gen.generate(_sample_model())
     sql = result.files["satellites/CustomerDetails.sql"]
     _assert_valid_sql(sql)
-    assert "CREATE TABLE IF NOT EXISTS CustomerDetails" in sql
-    assert "Customer_hk BINARY NOT NULL" in sql
-    assert "hash_diff BINARY NOT NULL" in sql
-    assert "load_end_ts TIMESTAMP" in sql
-    assert "first_name VARCHAR(255)" in sql
+    assert 'CREATE TABLE IF NOT EXISTS "CustomerDetails"' in sql
+    assert '"Customer_hk" CHAR(64) NOT NULL' in sql
+    assert '"hash_diff" CHAR(64) NOT NULL' in sql
+    assert '"load_end_ts" TIMESTAMP' in sql
+    assert '"first_name" VARCHAR(255)' in sql
 
 
 def test_sql_link_no_columns_valid():
@@ -121,8 +121,8 @@ def test_sql_link_no_columns_valid():
     result = gen.generate(model)
     sql = result.files["links/AB.sql"]
     _assert_valid_sql(sql)
-    assert "A_hk BINARY NOT NULL" in sql
-    assert "B_hk BINARY NOT NULL" in sql
+    assert '"A_hk" CHAR(64) NOT NULL' in sql
+    assert '"B_hk" CHAR(64) NOT NULL' in sql
 
 
 def test_sql_link_with_columns_valid():
@@ -143,9 +143,9 @@ def test_sql_link_with_columns_valid():
     result = gen.generate(model)
     sql = result.files["links/AB.sql"]
     _assert_valid_sql(sql)
-    assert "A_hk BINARY NOT NULL" in sql
-    assert "B_hk BINARY NOT NULL" in sql
-    assert "amount DECIMAL(18,2)" in sql
+    assert '"A_hk" CHAR(64) NOT NULL' in sql
+    assert '"B_hk" CHAR(64) NOT NULL' in sql
+    assert '"amount" DECIMAL(18,2)' in sql
 
 
 def test_sql_satellite_no_columns_valid():
@@ -163,7 +163,7 @@ def test_sql_satellite_no_columns_valid():
     result = gen.generate(model)
     sql = result.files["satellites/EmptySat.sql"]
     _assert_valid_sql(sql)
-    assert "hash_diff BINARY NOT NULL" in sql
+    assert '"hash_diff" CHAR(64) NOT NULL' in sql
 
 
 def test_sql_type_mapping_default():
@@ -201,9 +201,9 @@ def test_sql_jinja_postgres_dialect():
     model = _sample_model()
     result = gen.generate(model)
     hub_sql = result.files["hubs/Customer.sql"]
-    assert "TEXT" in hub_sql  # record_source mapped to TEXT for postgres
+    assert "INTEGER" in hub_sql  # customer_id (int) maps to INTEGER for postgres
     sat_sql = result.files["satellites/CustomerDetails.sql"]
-    assert "TEXT" in sat_sql  # first_name mapped to TEXT for postgres
+    assert "TEXT" in sat_sql  # first_name (string) mapped to TEXT for postgres
 
 
 # --- Spark DLT functional tests ---
@@ -351,10 +351,10 @@ def test_sql_nhsat_output_valid():
     sql = result.files["satellites/nhsat_CurrentStatus.sql"]
     _assert_valid_sql(sql)
     assert "MERGE INTO" in sql
-    assert "Customer_hk" in sql
+    assert '"Customer_hk"' in sql
     assert "hash_diff" not in sql
     assert "load_end_ts" not in sql
-    assert "status" in sql
+    assert '"status"' in sql
 
 
 def test_sql_nhlink_output_valid():
@@ -365,10 +365,10 @@ def test_sql_nhlink_output_valid():
     sql = result.files["links/nhlink_AB.sql"]
     _assert_valid_sql(sql)
     assert "MERGE INTO" in sql
-    assert "AB_hk" in sql
-    assert "A_hk" in sql
-    assert "B_hk" in sql
-    assert "amount" in sql
+    assert '"AB_hk"' in sql
+    assert '"A_hk"' in sql
+    assert '"B_hk"' in sql
+    assert '"amount"' in sql
 
 
 def test_sql_nhsat_no_columns_valid():
@@ -517,10 +517,10 @@ def test_sql_bridge_output_valid():
     _assert_valid_sql(sql)
     assert "CREATE OR REPLACE VIEW" in sql
     assert "CREATE TABLE" not in sql
-    assert "bridge_CustProd" in sql
-    assert "Customer" in sql
-    assert "CustomerProduct" in sql
-    assert "Product" in sql
+    assert '"bridge_CustProd"' in sql
+    assert '"Customer"' in sql
+    assert '"CustomerProduct"' in sql
+    assert '"Product"' in sql
     assert "JOIN" in sql
 
 
@@ -533,10 +533,10 @@ def test_sql_pit_output_valid():
     _assert_valid_sql(sql)
     assert "CREATE OR REPLACE VIEW" in sql
     assert "CREATE TABLE" not in sql
-    assert "pit_CustPit" in sql
-    assert "Customer_hk" in sql
+    assert '"pit_CustPit"' in sql
+    assert '"Customer_hk"' in sql
     assert "LEFT JOIN" in sql
-    assert "CustomerDetails" in sql
+    assert '"CustomerDetails"' in sql
 
 
 def test_sql_bridge_no_create_table():
@@ -672,9 +672,9 @@ def test_sql_effsat_output_valid():
     sql = result.files["satellites/effsat_CustProdValidity.sql"]
     _assert_valid_sql(sql)
     assert "MERGE INTO" in sql
-    assert "CustomerProduct_hk" in sql
-    assert "valid_from" in sql
-    assert "valid_to" in sql
+    assert '"CustomerProduct_hk"' in sql
+    assert '"valid_from"' in sql
+    assert '"valid_to"' in sql
     assert "hash_diff" not in sql
     assert "load_end_ts" not in sql
 
@@ -707,9 +707,9 @@ def test_sql_samlink_output_valid():
     sql = result.files["links/samlink_CustomerMatch.sql"]
     _assert_valid_sql(sql)
     assert "MERGE INTO" in sql
-    assert "CustomerMatch_hk" in sql
-    assert "Customer_hk" in sql
-    assert "confidence" in sql
+    assert '"CustomerMatch_hk"' in sql
+    assert '"Customer_hk"' in sql
+    assert '"confidence"' in sql
 
 
 def test_sql_samlink_no_columns_valid():
