@@ -1,4 +1,4 @@
-"""Generator registry -- discovers and manages available generators."""
+"""Generator registry — discovers and manages available generators."""
 
 from __future__ import annotations
 
@@ -9,21 +9,27 @@ from dmjedi.generators.base import BaseGenerator
 _REGISTRY: dict[str, type[BaseGenerator]] = {}
 
 
-def register(cls: type[BaseGenerator], name: str) -> None:
-    """Register a generator class by name."""
-    _REGISTRY[name] = cls
+def register(generator_cls: type[BaseGenerator]) -> None:
+    """Register a generator class."""
+    instance = generator_cls()
+    _REGISTRY[instance.name] = generator_cls
 
 
-def get(name: str, **params: Any) -> BaseGenerator:
-    """Instantiate a generator by name with parameters.
+def get(name: str, **kwargs: Any) -> BaseGenerator:
+    """Get a generator by name, instantiated with the given kwargs.
 
-    Raises KeyError if the generator name is not registered.
+    Raises KeyError if not found.
+
+    Examples:
+        registry.get("sql-jinja")
+        registry.get("sql-jinja", dialect="duckdb")
+        registry.get("sql-jinja", dialect="duckdb", hash_algo="sha256")
     """
     if name not in _REGISTRY:
-        available_names = ", ".join(sorted(_REGISTRY.keys())) or "(none)"
-        msg = f"Unknown generator '{name}'. Available: {available_names}"
+        available = ", ".join(sorted(_REGISTRY.keys())) or "(none)"
+        msg = f"Unknown generator '{name}'. Available: {available}"
         raise KeyError(msg)
-    return _REGISTRY[name](**params)
+    return _REGISTRY[name](**kwargs)
 
 
 def available() -> list[str]:
@@ -36,8 +42,8 @@ def _auto_register() -> None:
     from dmjedi.generators.spark_declarative.generator import SparkDeclarativeGenerator
     from dmjedi.generators.sql_jinja.generator import SqlJinjaGenerator
 
-    register(SparkDeclarativeGenerator, "spark-declarative")
-    register(SqlJinjaGenerator, "sql-jinja")
+    register(SparkDeclarativeGenerator)
+    register(SqlJinjaGenerator)
 
 
 _auto_register()

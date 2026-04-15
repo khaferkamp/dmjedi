@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
 from dmjedi.generators.base import BaseGenerator, GeneratorResult
+from dmjedi.generators.sql_jinja.hash import build_hash_expr
 from dmjedi.generators.sql_jinja.types import map_type
 from dmjedi.model.core import DataVaultModel
 
@@ -15,8 +15,9 @@ _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 
 class SqlJinjaGenerator(BaseGenerator):
-    def __init__(self, dialect: str = "default", **kwargs: Any) -> None:
+    def __init__(self, dialect: str = "default", hash_algo: str = "sha256", **kwargs: object) -> None:
         self._dialect = dialect
+        self._hash_algo = hash_algo
 
     @property
     def name(self) -> str:
@@ -29,6 +30,9 @@ class SqlJinjaGenerator(BaseGenerator):
             autoescape=False,
         )
         env.globals["map_type"] = lambda t: map_type(t, self._dialect)
+        env.filters["q"] = lambda name: f'"{name}"'
+        env.globals["hash_expr"] = lambda cols: build_hash_expr(cols, self._dialect, self._hash_algo)
+        env.globals["dialect"] = self._dialect
         result = GeneratorResult()
 
         hub_tpl = env.get_template("hub.sql.j2")
