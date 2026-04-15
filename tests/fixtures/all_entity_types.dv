@@ -1,0 +1,54 @@
+# Comprehensive fixture: all 9 DV2.1 entity types
+# Used by dialect snapshot tests
+
+namespace test
+
+hub Customer {
+    business_key customer_id : int
+}
+
+hub Product {
+    business_key product_id : int
+    business_key sku : string
+}
+
+satellite CustomerDetails of Customer {
+    first_name : string
+    last_name : string
+    email : string
+}
+
+link CustomerProduct {
+    references Customer, Product
+    quantity : int
+}
+
+nhsat CurrentStatus of Customer {
+    status : string
+    updated_at : timestamp
+}
+
+nhlink ActiveRelation {
+    references Customer, Product
+    score : decimal
+}
+
+effsat RelationValidity of CustomerProduct {
+    valid_from : timestamp
+    valid_to : timestamp
+}
+
+samlink CustomerMatch {
+    master Customer
+    duplicate Customer
+    confidence : decimal
+}
+
+bridge CustomerProductBridge {
+    path Customer -> CustomerProduct -> Product
+}
+
+pit CustomerPit {
+    of Customer
+    tracks CustomerDetails
+}
