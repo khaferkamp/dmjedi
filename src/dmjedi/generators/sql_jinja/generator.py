@@ -15,7 +15,9 @@ _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 
 class SqlJinjaGenerator(BaseGenerator):
-    def __init__(self, dialect: str = "default", hash_algo: str = "sha256", **kwargs: object) -> None:
+    def __init__(
+        self, dialect: str = "default", hash_algo: str = "sha256", **kwargs: object
+    ) -> None:
         self._dialect = dialect
         self._hash_algo = hash_algo
 
@@ -31,7 +33,9 @@ class SqlJinjaGenerator(BaseGenerator):
         )
         env.globals["map_type"] = lambda t: map_type(t, self._dialect)
         env.filters["q"] = lambda name: f'"{name}"'
-        env.globals["hash_expr"] = lambda cols: build_hash_expr(cols, self._dialect, self._hash_algo)
+        env.globals["hash_expr"] = lambda cols: build_hash_expr(
+            cols, self._dialect, self._hash_algo
+        )
         env.globals["dialect"] = self._dialect
         result = GeneratorResult()
 
