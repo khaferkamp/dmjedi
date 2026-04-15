@@ -60,12 +60,18 @@ def test_e2e_sql_pipeline():
     gen = registry.get("sql-jinja")
     result = gen.generate(model)
 
-    assert len(result.files) == 8, f"Expected 8 files, got {sorted(result.files.keys())}"
+    ddl_files = {k: v for k, v in result.files.items() if not k.startswith("staging/")}
+    assert len(ddl_files) == 8, f"Expected 8 DDL files, got {sorted(ddl_files.keys())}"
 
-    for filename, sql in result.files.items():
+    for filename, sql in ddl_files.items():
         assert "CREATE TABLE" in sql, f"{filename} missing CREATE TABLE"
         stripped = sql.replace(" ", "").replace("\n", "")
         assert ",)" not in stripped, f"{filename} has trailing comma before )"
+
+    staging_files = {k: v for k, v in result.files.items() if k.startswith("staging/")}
+    assert len(staging_files) == 8, f"Expected 8 staging files, got {sorted(staging_files.keys())}"
+    for filename, sql in staging_files.items():
+        assert "CREATE OR REPLACE VIEW" in sql, f"{filename} missing CREATE OR REPLACE VIEW"
 
 
 def test_e2e_spark_pipeline():
