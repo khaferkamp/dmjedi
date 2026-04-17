@@ -708,7 +708,8 @@ def test_sql_samlink_output_valid():
     _assert_valid_sql(sql)
     assert "MERGE INTO" in sql
     assert '"CustomerMatch_hk"' in sql
-    assert '"Customer_hk"' in sql
+    assert '"master_Customer_hk"' in sql
+    assert '"duplicate_Customer_hk"' in sql
     assert '"confidence"' in sql
 
 

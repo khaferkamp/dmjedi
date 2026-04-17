@@ -7,7 +7,7 @@ SELECT
     encode(sha256((COALESCE("Customer_hk", '') || '||' || COALESCE("Customer_hk", ''))::bytea), 'hex') AS "CustomerMatch_hk",
     CURRENT_TIMESTAMP AS "load_ts",
     'dmjedi' AS "record_source",
-    "Customer_hk",
-    "Customer_hk",
+    "Customer_hk" AS "master_Customer_hk",
+    "Customer_hk" AS "duplicate_Customer_hk",
     "confidence"
 FROM "src_CustomerMatch";

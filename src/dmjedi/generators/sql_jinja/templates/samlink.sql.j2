@@ -4,18 +4,27 @@
 -- NOTE: Requires ANSI_MODE=true and spark.sql.doubleQuotedIdentifiers=true
 {% endif -%}
 
+{%- set master_hk = samlink.master_ref ~ '_hk' %}
+{%- set duplicate_hk = samlink.duplicate_ref ~ '_hk' %}
+{%- set master_col = master_hk %}
+{%- set duplicate_col = duplicate_hk %}
+{%- if master_hk == duplicate_hk %}
+{%- set master_col = 'master_' ~ master_hk %}
+{%- set duplicate_col = 'duplicate_' ~ duplicate_hk %}
+{%- endif %}
+
 MERGE INTO {{ samlink.name | q }} AS target
-USING {{ ('src_' ~ samlink.name) | q }} AS source
+USING {{ ('stg_' ~ samlink.name) | q }} AS source
 ON target.{{ (samlink.name ~ '_hk') | q }} = source.{{ (samlink.name ~ '_hk') | q }}
 WHEN MATCHED THEN
     UPDATE SET
-        target.{{ "load_ts" | q }} = source.{{ "load_ts" | q }},
-        target.{{ "record_source" | q }} = source.{{ "record_source" | q }},
-        target.{{ (samlink.master_ref ~ '_hk') | q }} = source.{{ (samlink.master_ref ~ '_hk') | q }},
-        target.{{ (samlink.duplicate_ref ~ '_hk') | q }} = source.{{ (samlink.duplicate_ref ~ '_hk') | q }}{% if samlink.columns %},{% endif %}
+        {{ "load_ts" | q }} = source.{{ "load_ts" | q }},
+        {{ "record_source" | q }} = source.{{ "record_source" | q }},
+        {{ master_col | q }} = source.{{ master_col | q }},
+        {{ duplicate_col | q }} = source.{{ duplicate_col | q }}{% if samlink.columns %},{% endif %}
 {%- for col in samlink.columns %}
-        target.{{ col.name | q }} = source.{{ col.name | q }}{% if not loop.last %},{% endif %}
+        {{ col.name | q }} = source.{{ col.name | q }}{% if not loop.last %},{% endif %}
 {%- endfor %}
 WHEN NOT MATCHED THEN
-    INSERT ({{ (samlink.name ~ '_hk') | q }}, {{ "load_ts" | q }}, {{ "record_source" | q }}, {{ (samlink.master_ref ~ '_hk') | q }}, {{ (samlink.duplicate_ref ~ '_hk') | q }}{% if samlink.columns %}, {% endif %}{% for col in samlink.columns %}{{ col.name | q }}{% if not loop.last %}, {% endif %}{% endfor %})
-    VALUES (source.{{ (samlink.name ~ '_hk') | q }}, source.{{ "load_ts" | q }}, source.{{ "record_source" | q }}, source.{{ (samlink.master_ref ~ '_hk') | q }}, source.{{ (samlink.duplicate_ref ~ '_hk') | q }}{% if samlink.columns %}, {% endif %}{% for col in samlink.columns %}source.{{ col.name | q }}{% if not loop.last %}, {% endif %}{% endfor %});
+    INSERT ({{ (samlink.name ~ '_hk') | q }}, {{ "load_ts" | q }}, {{ "record_source" | q }}, {{ master_col | q }}, {{ duplicate_col | q }}{% if samlink.columns %}, {% endif %}{% for col in samlink.columns %}{{ col.name | q }}{% if not loop.last %}, {% endif %}{% endfor %})
+    VALUES (source.{{ (samlink.name ~ '_hk') | q }}, source.{{ "load_ts" | q }}, source.{{ "record_source" | q }}, source.{{ master_col | q }}, source.{{ duplicate_col | q }}{% if samlink.columns %}, {% endif %}{% for col in samlink.columns %}source.{{ col.name | q }}{% if not loop.last %}, {% endif %}{% endfor %});

@@ -4,14 +4,22 @@
 -- NOTE: Requires ANSI_MODE=true and spark.sql.doubleQuotedIdentifiers=true
 {% endif -%}
 {%- set ref_hk_names = [samlink.master_ref ~ '_hk', samlink.duplicate_ref ~ '_hk'] %}
+{%- set master_hk = samlink.master_ref ~ '_hk' %}
+{%- set duplicate_hk = samlink.duplicate_ref ~ '_hk' %}
+{%- set master_col = master_hk %}
+{%- set duplicate_col = duplicate_hk %}
+{%- if master_hk == duplicate_hk %}
+{%- set master_col = 'master_' ~ master_hk %}
+{%- set duplicate_col = 'duplicate_' ~ duplicate_hk %}
+{%- endif %}
 
 CREATE OR REPLACE VIEW {{ ('stg_' ~ samlink.name) | q }} AS
 SELECT
     {{ hash_expr(ref_hk_names) }} AS {{ (samlink.name ~ '_hk') | q }},
     CURRENT_TIMESTAMP AS {{ "load_ts" | q }},
     'dmjedi' AS {{ "record_source" | q }},
-    {{ (samlink.master_ref ~ '_hk') | q }},
-    {{ (samlink.duplicate_ref ~ '_hk') | q }}{% if samlink.columns %},{% endif %}
+    {{ master_hk | q }} AS {{ master_col | q }},
+    {{ duplicate_hk | q }} AS {{ duplicate_col | q }}{% if samlink.columns %},{% endif %}
 {%- for col in samlink.columns %}
     {{ col.name | q }}{% if not loop.last %},{% endif %}
 {%- endfor %}

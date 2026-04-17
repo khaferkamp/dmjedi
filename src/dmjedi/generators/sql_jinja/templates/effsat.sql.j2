@@ -5,14 +5,14 @@
 {% endif -%}
 
 MERGE INTO {{ effsat.name | q }} AS target
-USING {{ ('src_' ~ effsat.name) | q }} AS source
+USING {{ ('stg_' ~ effsat.name) | q }} AS source
 ON target.{{ (effsat.parent_ref ~ '_hk') | q }} = source.{{ (effsat.parent_ref ~ '_hk') | q }}
 WHEN MATCHED THEN
     UPDATE SET
-        target.{{ "load_ts" | q }} = source.{{ "load_ts" | q }},
-        target.{{ "record_source" | q }} = source.{{ "record_source" | q }}{% if effsat.columns %},{% endif %}
+        {{ "load_ts" | q }} = source.{{ "load_ts" | q }},
+        {{ "record_source" | q }} = source.{{ "record_source" | q }}{% if effsat.columns %},{% endif %}
 {%- for col in effsat.columns %}
-        target.{{ col.name | q }} = source.{{ col.name | q }}{% if not loop.last %},{% endif %}
+        {{ col.name | q }} = source.{{ col.name | q }}{% if not loop.last %},{% endif %}
 {%- endfor %}
 WHEN NOT MATCHED THEN
     INSERT ({{ (effsat.parent_ref ~ '_hk') | q }}, {{ "load_ts" | q }}, {{ "record_source" | q }}{% if effsat.columns %}, {% endif %}{% for col in effsat.columns %}{{ col.name | q }}{% if not loop.last %}, {% endif %}{% endfor %})

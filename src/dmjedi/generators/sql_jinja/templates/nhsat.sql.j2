@@ -5,14 +5,14 @@
 {% endif -%}
 
 MERGE INTO {{ nhsat.name | q }} AS target
-USING {{ ('src_' ~ nhsat.name) | q }} AS source
+USING {{ ('stg_' ~ nhsat.name) | q }} AS source
 ON target.{{ (nhsat.parent_ref ~ '_hk') | q }} = source.{{ (nhsat.parent_ref ~ '_hk') | q }}
 WHEN MATCHED THEN
     UPDATE SET
-        target.{{ "load_ts" | q }} = source.{{ "load_ts" | q }},
-        target.{{ "record_source" | q }} = source.{{ "record_source" | q }}{% if nhsat.columns %},{% endif %}
+        {{ "load_ts" | q }} = source.{{ "load_ts" | q }},
+        {{ "record_source" | q }} = source.{{ "record_source" | q }}{% if nhsat.columns %},{% endif %}
 {%- for col in nhsat.columns %}
-        target.{{ col.name | q }} = source.{{ col.name | q }}{% if not loop.last %},{% endif %}
+        {{ col.name | q }} = source.{{ col.name | q }}{% if not loop.last %},{% endif %}
 {%- endfor %}
 WHEN NOT MATCHED THEN
     INSERT ({{ (nhsat.parent_ref ~ '_hk') | q }}, {{ "load_ts" | q }}, {{ "record_source" | q }}{% if nhsat.columns %}, {% endif %}{% for col in nhsat.columns %}{{ col.name | q }}{% if not loop.last %}, {% endif %}{% endfor %})
