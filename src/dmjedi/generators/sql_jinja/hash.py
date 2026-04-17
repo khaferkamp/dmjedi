@@ -54,7 +54,10 @@ def build_hash_expr(
     Returns:
         Complete SQL hash expression string.
     """
-    parts = [f"""COALESCE("{col}", '')""" for col in columns]
+    if dialect == "duckdb":
+        parts = [f"""COALESCE(CAST("{col}" AS VARCHAR), '')""" for col in columns]
+    else:
+        parts = [f"""COALESCE("{col}", '')""" for col in columns]
     concat = " || '||' || ".join(parts)
     # Lookup: dialect+algo -> default+algo -> default+sha256
     dialect_funcs = _HASH_FUNCTIONS.get(dialect, _HASH_FUNCTIONS["default"])

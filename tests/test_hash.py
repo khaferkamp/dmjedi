@@ -8,12 +8,15 @@ class TestBuildHashExprDuckDB:
 
     def test_single_column(self) -> None:
         result = build_hash_expr(["customer_id"], "duckdb")
-        assert result == """sha256(COALESCE("customer_id", ''))"""
+        assert result == """sha256(COALESCE(CAST("customer_id" AS VARCHAR), ''))"""
 
     def test_multi_column_delimiter(self) -> None:
         result = build_hash_expr(["a", "b"], "duckdb")
         assert "|| '||' ||" in result
-        assert result == """sha256(COALESCE("a", '') || '||' || COALESCE("b", ''))"""
+        assert result == (
+            """sha256(COALESCE(CAST("a" AS VARCHAR), '') || '||' || """
+            """COALESCE(CAST("b" AS VARCHAR), ''))"""
+        )
 
     def test_three_columns(self) -> None:
         result = build_hash_expr(["x", "y", "z"], "duckdb")

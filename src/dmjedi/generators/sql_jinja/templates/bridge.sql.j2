@@ -7,10 +7,10 @@
 
 CREATE OR REPLACE VIEW {{ ('bridge_' ~ bridge.name) | q }} AS
 SELECT
-    {{ (path[0] ~ '_hk') | q }}
+    {{ path[0] | q }}.{{ (path[0] ~ '_hk') | q }}
 {%- for i in range(1, path|length, 2) %}
-    , {{ (path[i] ~ '_hk') | q }}
-    , {{ (path[i + 1] ~ '_hk') | q }}
+    , {{ path[i] | q }}.{{ (path[i] ~ '_hk') | q }}
+    , {{ path[i + 1] | q }}.{{ (path[i + 1] ~ '_hk') | q }}
 {%- endfor %}
 FROM {{ path[0] | q }}
 {%- for i in range(1, path|length, 2) %}

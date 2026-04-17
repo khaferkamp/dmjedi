@@ -12,6 +12,14 @@ from dmjedi.lang.linter import Severity, lint
 from dmjedi.lang.parser import parse, parse_file
 from dmjedi.model.core import Column, DataVaultModel, Hub, Link, Satellite
 from dmjedi.model.resolver import ResolverErrors, resolve
+from tests.fixtures.all_entity_rows import (
+    CUSTOMER_1001_HK,
+    CUSTOMER_1002_HK,
+    CUSTOMER_PRODUCT_1001_2001_HK,
+    CUSTOMER_PRODUCT_1002_2002_HK,
+    PRODUCT_2001_HK,
+    PRODUCT_2002_HK,
+)
 from tests.helpers.sql_execution import execute_sql_files, fetch_all, load_source_tables
 
 
@@ -165,19 +173,76 @@ def test_e2e_write_to_disk(tmp_path: Path):
 def test_e2e_duckdb_behavioral_sql_flow(duckdb_generated_result, all_entity_source_rows):
     """Generated DuckDB SQL should produce observable rows from canonical source data."""
     conn = duckdb.connect(":memory:")
-    load_source_tables(conn, all_entity_source_rows)
+    try:
+        load_source_tables(conn, all_entity_source_rows)
 
-    execute_sql_files(
-        conn,
-        duckdb_generated_result.files,
-        prefixes=("hubs/", "satellites/", "links/", "staging/", "views/"),
-    )
+        execute_sql_files(
+            conn,
+            duckdb_generated_result.files,
+            prefixes=("hubs/", "staging/hubs/"),
+        )
+        conn.execute(duckdb_generated_result.files["links/CustomerProduct.sql"])
+        conn.execute(duckdb_generated_result.files["satellites/CustomerDetails.sql"])
+        conn.execute(duckdb_generated_result.files["staging/links/CustomerProduct.sql"])
+        conn.execute(duckdb_generated_result.files["staging/satellites/CustomerDetails.sql"])
 
-    customer_rows = fetch_all(
-        conn,
-        'SELECT "customer_id" FROM "Customer" ORDER BY "customer_id"',
-    )
-    assert customer_rows == [(1001,), (1002,)]
+        conn.execute('INSERT INTO "Customer" SELECT * FROM "stg_Customer"')
+        conn.execute('INSERT INTO "Product" SELECT * FROM "stg_Product"')
+        conn.execute('INSERT INTO "CustomerDetails" SELECT * FROM "stg_CustomerDetails"')
+        conn.execute('INSERT INTO "CustomerProduct" SELECT * FROM "stg_CustomerProduct"')
+
+        conn.execute(duckdb_generated_result.files["views/bridge_CustomerProductBridge.sql"])
+        conn.execute(duckdb_generated_result.files["views/pit_CustomerPit.sql"])
+
+        customer_rows = fetch_all(
+            conn,
+            'SELECT "Customer_hk", "customer_id" FROM "Customer" ORDER BY "customer_id"',
+        )
+        assert customer_rows == [
+            (CUSTOMER_1001_HK, 1001),
+            (CUSTOMER_1002_HK, 1002),
+        ]
+
+        satellite_rows = fetch_all(
+            conn,
+            'SELECT "Customer_hk", "first_name", "last_name", "email" '
+            'FROM "CustomerDetails" ORDER BY "email"',
+        )
+        assert satellite_rows == [
+            (CUSTOMER_1001_HK, "Ana", "Nguyen", "ana.nguyen@example.com"),
+            (CUSTOMER_1002_HK, "Ben", "Patel", "ben.patel@example.com"),
+        ]
+
+        link_rows = fetch_all(
+            conn,
+            'SELECT "CustomerProduct_hk", "Customer_hk", "Product_hk", "quantity" '
+            'FROM "CustomerProduct" ORDER BY "quantity" DESC, "CustomerProduct_hk"',
+        )
+        assert link_rows == [
+            (CUSTOMER_PRODUCT_1001_2001_HK, CUSTOMER_1001_HK, PRODUCT_2001_HK, 2),
+            (CUSTOMER_PRODUCT_1002_2002_HK, CUSTOMER_1002_HK, PRODUCT_2002_HK, 1),
+        ]
+
+        bridge_rows = fetch_all(
+            conn,
+            'SELECT "Customer_hk", "CustomerProduct_hk", "Product_hk" '
+            'FROM "bridge_CustomerProductBridge" ORDER BY "CustomerProduct_hk"',
+        )
+        assert bridge_rows == [
+            (CUSTOMER_1002_HK, CUSTOMER_PRODUCT_1002_2002_HK, PRODUCT_2002_HK),
+            (CUSTOMER_1001_HK, CUSTOMER_PRODUCT_1001_2001_HK, PRODUCT_2001_HK),
+        ]
+
+        pit_rows = fetch_all(
+            conn,
+            'SELECT "Customer_hk", "CustomerDetails_hash_diff" '
+            'FROM "pit_CustomerPit" ORDER BY "Customer_hk"',
+        )
+        assert len(pit_rows) == 2
+        assert all(customer_hk in {CUSTOMER_1001_HK, CUSTOMER_1002_HK} for customer_hk, _ in pit_rows)
+        assert all(isinstance(hash_diff, str) and len(hash_diff) == 64 for _, hash_diff in pit_rows)
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------
