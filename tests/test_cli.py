@@ -6,6 +6,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
+import dmjedi.cli.main as cli_main
 from dmjedi.cli.errors import format_lint_diagnostic, format_parse_error
 from dmjedi.cli.main import app
 from dmjedi.lang.ast import SourceLocation
@@ -258,7 +259,8 @@ def test_cli_dialect_non_sql_jinja_warns(tmp_path: Path) -> None:
     )
     assert result.exit_code == 0
     # Warning must be present in combined output
-    combined = result.output + (result.stderr if hasattr(result, "stderr") and result.stderr else "")
+    stderr = result.stderr if hasattr(result, "stderr") and result.stderr else ""
+    combined = result.output + stderr
     assert "Warning" in combined or "warning" in combined.lower()
     assert "dialect" in combined.lower()
 
@@ -279,3 +281,17 @@ def test_cli_dialect_invalid_value(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code != 0
+
+
+def test_lsp_command_starts_server(monkeypatch) -> None:
+    started: list[bool] = []
+
+    def fake_start_server() -> None:
+        started.append(True)
+
+    monkeypatch.setattr(cli_main, "start_server", fake_start_server)
+
+    result = runner.invoke(app, ["lsp"])
+
+    assert result.exit_code == 0
+    assert started == [True]

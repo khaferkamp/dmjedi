@@ -15,6 +15,7 @@ from dmjedi.lang.discovery import discover_dv_files
 from dmjedi.lang.imports import CircularImportError, resolve_imports
 from dmjedi.lang.linter import LintDiagnostic, Severity, lint
 from dmjedi.lang.parser import DVMLParseError, parse_file
+from dmjedi.lsp.server import start_server
 from dmjedi.model.resolver import ResolverErrors, resolve
 
 app = typer.Typer(
@@ -199,9 +200,7 @@ def docs(
 @app.command()
 def lsp() -> None:
     """Start the DVML Language Server."""
-    console = Console(stderr=True)
-    console.print("[red]Error:[/red] LSP server is not yet implemented.")
-    raise typer.Exit(code=1)
+    start_server()
 
 
 def _parse_all(paths: list[Path], console: Console) -> list[DVMLModule]:
