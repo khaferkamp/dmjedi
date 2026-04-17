@@ -180,3 +180,8 @@ def test_staging_uses_coalesce_and_delimiter(dialect, generated_results):
     stg_sql = result.files["staging/hubs/Product.sql"]
     assert "COALESCE(" in stg_sql, f"{dialect}: missing COALESCE"
     assert "|| '||' ||" in stg_sql, f"{dialect}: missing double-pipe delimiter"
+
+
+def test_databricks_sqlglot_parses_every_generated_file(generated_results):
+    """Every generated Databricks SQL file should parse under SQLGlot."""
+    _assert_databricks_files_parse(generated_results["databricks"].files)
