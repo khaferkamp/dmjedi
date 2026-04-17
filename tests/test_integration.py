@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import duckdb
 import pytest
 
 from dmjedi.docs.markdown import generate_markdown
@@ -11,6 +12,7 @@ from dmjedi.lang.linter import Severity, lint
 from dmjedi.lang.parser import parse, parse_file
 from dmjedi.model.core import Column, DataVaultModel, Hub, Link, Satellite
 from dmjedi.model.resolver import ResolverErrors, resolve
+from tests.helpers.sql_execution import execute_sql_files, fetch_all, load_source_tables
 
 
 def _sample_model() -> DataVaultModel:
@@ -158,6 +160,24 @@ def test_e2e_write_to_disk(tmp_path: Path):
     first_rel = next(iter(result.files))
     first_path = tmp_path / first_rel
     assert first_path.read_text() == result.files[first_rel]
+
+
+def test_e2e_duckdb_behavioral_sql_flow(duckdb_generated_result, all_entity_source_rows):
+    """Generated DuckDB SQL should produce observable rows from canonical source data."""
+    conn = duckdb.connect(":memory:")
+    load_source_tables(conn, all_entity_source_rows)
+
+    execute_sql_files(
+        conn,
+        duckdb_generated_result.files,
+        prefixes=("hubs/", "satellites/", "links/", "staging/", "views/"),
+    )
+
+    customer_rows = fetch_all(
+        conn,
+        'SELECT "customer_id" FROM "Customer" ORDER BY "customer_id"',
+    )
+    assert customer_rows == [(1001,), (1002,)]
 
 
 # ---------------------------------------------------------------------------
