@@ -43,8 +43,8 @@ Requirements for v0.2.0 milestone. Each maps to roadmap phases.
 
 ### Testing
 
-- [ ] **TEST-01**: Integration tests execute generated DuckDB SQL against real in-memory DuckDB database
-- [ ] **TEST-02**: Canonical fixture data exists for all DV2.1 entity types (hubs, sats, links, nhsats, nhlinks, effsats, samlinks, bridges, PITs)
+- [x] **TEST-01**: Integration tests execute generated DuckDB SQL against real in-memory DuckDB database
+- [x] **TEST-02**: Canonical fixture data exists for all DV2.1 entity types (hubs, sats, links, nhsats, nhlinks, effsats, samlinks, bridges, PITs)
 - [ ] **TEST-03**: SQLGlot validates syntax of generated Databricks SQL output
 - [x] **TEST-04**: Test suite enforces minimum coverage threshold
 
@@ -104,8 +104,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DIAL-03 | Phase 2: SQL Dialects | Pending |
 | DIAL-04 | Phase 2: SQL Dialects | Pending |
 | DIAL-05 | Phase 2: SQL Dialects | Pending |
-| TEST-01 | Phase 3: Integration Testing | Pending |
-| TEST-02 | Phase 3: Integration Testing | Pending |
+| TEST-01 | Phase 3: Integration Testing | Complete |
+| TEST-02 | Phase 3: Integration Testing | Complete |
 | TEST-03 | Phase 3: Integration Testing | Pending |
 | TEST-04 | Phase 3: Integration Testing | Complete |
 | LSP-01 | Phase 4: LSP Server | Pending |
@@ -125,8 +125,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 **Coverage:**
 - v0.2.0 requirements: 25 total
-- Satisfied: 2 (GEN-01, GEN-02)
-- Pending: 23
+- Satisfied: 4 (GEN-01, GEN-02, TEST-01, TEST-02)
+- Pending: 21
 - Mapped to phases: 25
 - Unmapped: 0
 
