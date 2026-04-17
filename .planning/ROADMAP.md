@@ -2,7 +2,7 @@
 
 **Milestone:** v0.2.0
 **Created:** 2026-04-12
-**Updated:** 2026-04-17 (Phase 03-02 executed)
+**Updated:** 2026-04-17 (Phase 03 complete)
 **Phases:** 6 (Phase 1 complete, Phases 2-6 from gap closure)
 
 ## Phase 1: Generator Infrastructure [COMPLETE]
@@ -35,7 +35,7 @@ Plans:
 
 ---
 
-## Phase 3: Integration Testing
+## Phase 3: Integration Testing [COMPLETE]
 
 **Goal:** Validate generated SQL against real databases and enforce quality gates — DuckDB execution tests, canonical fixtures, SQLGlot syntax validation, and coverage thresholds.
 **Requirements:** TEST-01, TEST-02, TEST-03, TEST-04
@@ -46,7 +46,7 @@ Plans:
 Plans:
 - [x] 03-01-PLAN.md — uv/bootstrap setup for DuckDB + SQLGlot dependencies and the 85% pytest-cov gate
 - [x] 03-02-PLAN.md — shared canonical source-row fixtures and DuckDB execution helpers for Phase 03 tests
-- [ ] 03-03-PLAN.md — behavioral DuckDB integration assertions plus full Databricks SQLGlot parsing over generated files
+- [x] 03-03-PLAN.md — behavioral DuckDB integration assertions plus full Databricks SQLGlot parsing over generated files
 
 ### Success Criteria
 - Generated DuckDB SQL executes successfully against in-memory DuckDB
