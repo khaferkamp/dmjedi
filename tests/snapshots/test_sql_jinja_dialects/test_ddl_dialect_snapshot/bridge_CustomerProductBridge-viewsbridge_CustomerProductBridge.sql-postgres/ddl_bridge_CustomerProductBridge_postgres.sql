@@ -4,9 +4,9 @@
 
 CREATE OR REPLACE VIEW "bridge_CustomerProductBridge" AS
 SELECT
-    "Customer_hk"
-    , "CustomerProduct_hk"
-    , "Product_hk"
+    "Customer"."Customer_hk"
+    , "CustomerProduct"."CustomerProduct_hk"
+    , "Product"."Product_hk"
 FROM "Customer"
 JOIN "CustomerProduct"
     ON "CustomerProduct"."Customer_hk" = "Customer"."Customer_hk"

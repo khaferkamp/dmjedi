@@ -4,7 +4,7 @@
 
 CREATE OR REPLACE VIEW "stg_ActiveRelation" AS
 SELECT
-    sha256(COALESCE("Customer_hk", '') || '||' || COALESCE("Product_hk", '')) AS "ActiveRelation_hk",
+    sha256(COALESCE(CAST("Customer_hk" AS VARCHAR), '') || '||' || COALESCE(CAST("Product_hk" AS VARCHAR), '')) AS "ActiveRelation_hk",
     CURRENT_TIMESTAMP AS "load_ts",
     'dmjedi' AS "record_source",
     "Customer_hk",

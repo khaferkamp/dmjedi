@@ -6,7 +6,7 @@ SELECT
     CURRENT_TIMESTAMP AS "load_ts",
     CURRENT_TIMESTAMP AS "load_end_ts",
     'dmjedi' AS "record_source",
-    sha256(COALESCE("first_name", '') || '||' || COALESCE("last_name", '') || '||' || COALESCE("email", '')) AS "hash_diff",
+    sha256(COALESCE(CAST("first_name" AS VARCHAR), '') || '||' || COALESCE(CAST("last_name" AS VARCHAR), '') || '||' || COALESCE(CAST("email" AS VARCHAR), '')) AS "hash_diff",
     "first_name",
     "last_name",
     "email"

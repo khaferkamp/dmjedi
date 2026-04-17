@@ -7,6 +7,8 @@ across all 9 DV2.1 entity types. Per D-11 and D-12.
 from pathlib import Path
 
 import pytest
+from sqlglot import parse
+from sqlglot.errors import ParseError
 
 from dmjedi.generators import registry
 from dmjedi.lang.parser import parse_file
@@ -39,6 +41,16 @@ STAGING_ENTITY_FILES = {
     "staging_effsat_RelationValidity": "staging/satellites/effsat_RelationValidity.sql",
     "staging_samlink_CustomerMatch": "staging/links/samlink_CustomerMatch.sql",
 }
+
+
+def _assert_databricks_files_parse(files: dict[str, str]) -> None:
+    for file_key, sql in sorted(files.items()):
+        try:
+            expressions = parse(sql, dialect="databricks")
+        except ParseError as exc:
+            pytest.fail(f"databricks parse failed for {file_key}: {exc}")
+
+        assert expressions, f"databricks parse returned no expressions for {file_key}"
 
 
 @pytest.fixture(scope="module")
