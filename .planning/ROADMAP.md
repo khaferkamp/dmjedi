@@ -62,6 +62,12 @@ Plans:
 **Requirements:** LSP-01, LSP-02, LSP-03, LSP-04, LSP-05, LSP-06
 **Depends on:** Phase 1 (parser/linter infrastructure)
 **Gap Closure:** Closes 6 orphaned requirements from milestone audit
+**Plans:** 3 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — current-document diagnostics foundation, `pygls` server bootstrap, and `dmjedi lsp` CLI wiring
+- [ ] 04-02-PLAN.md — conservative keyword and same-document entity-reference completions
+- [ ] 04-03-PLAN.md — same-document hover, go-to-definition, document symbols, and the final Phase 04 test gate
 
 ### Success Criteria
 - Parse errors and lint warnings appear as editor diagnostics on save/type
