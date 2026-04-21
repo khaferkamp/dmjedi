@@ -23,7 +23,7 @@ from dmjedi.lang.ast import (
 )
 from dmjedi.lang.linter import lint
 from dmjedi.lang.parser import DVMLParseError, parse
-from dmjedi.lsp.protocol import lint_diagnostic_to_lsp, parse_error_to_lsp
+from dmjedi.lsp.protocol import lint_diagnostic_to_lsp, parse_error_to_lsp, semantic_diagnostic
 
 _DECLARATION_KEYWORDS = (
     "namespace",
@@ -131,6 +131,7 @@ def analyze_document(uri: str, source: str, version: int | None) -> DocumentAnal
 
     declarations = build_declaration_index(module)
     diagnostics = [lint_diagnostic_to_lsp(diagnostic, source) for diagnostic in lint(module)]
+    diagnostics.extend(semantic_diagnostics(module, declarations, source))
     return DocumentAnalysis(
         uri=uri,
         version=version,
@@ -270,6 +271,23 @@ def declaration_infos(analysis: DocumentAnalysis) -> list[DeclarationInfo]:
     return _sorted_declarations(analysis)
 
 
+def semantic_diagnostics(
+    module: DVMLModule,
+    declarations: dict[str, DeclarationInfo],
+    source: str,
+) -> list[types.Diagnostic]:
+    """Build same-document semantic diagnostics without widening into workspace scope."""
+    diagnostics: list[types.Diagnostic] = []
+    diagnostics.extend(
+        _parent_diagnostics(module.satellites, declarations, source, {"hub", "link"})
+    )
+    diagnostics.extend(_parent_diagnostics(module.nhsats, declarations, source, {"hub", "link"}))
+    diagnostics.extend(
+        _parent_diagnostics(module.effsats, declarations, source, {"link", "nhlink"})
+    )
+    return diagnostics
+
+
 def _entity_info(
     declaration: SatelliteDecl
     | LinkDecl
@@ -291,6 +309,43 @@ def _entity_info(
         fields=fields,
         references=references,
     )
+
+
+def _parent_diagnostics(
+    declarations_with_parent: list[SatelliteDecl | NhSatDecl | EffSatDecl],
+    declarations: dict[str, DeclarationInfo],
+    source: str,
+    allowed_kinds: set[str],
+) -> list[types.Diagnostic]:
+    diagnostics: list[types.Diagnostic] = []
+    for declaration in declarations_with_parent:
+        parent = declarations.get(declaration.parent_ref)
+        if parent is None:
+            diagnostics.append(
+                semantic_diagnostic(
+                    source=source,
+                    line=declaration.loc.line,
+                    token=declaration.parent_ref,
+                    message=f"Unknown parent '{declaration.parent_ref}'",
+                    code="unknown-parent",
+                )
+            )
+            continue
+        if parent.kind not in allowed_kinds:
+            allowed = " or ".join(sorted(allowed_kinds))
+            diagnostics.append(
+                semantic_diagnostic(
+                    source=source,
+                    line=declaration.loc.line,
+                    token=declaration.parent_ref,
+                    message=(
+                        f"Invalid parent '{declaration.parent_ref}': "
+                        f"{declaration.__class__.__name__.replace('Decl', '')} requires {allowed}"
+                    ),
+                    code="invalid-parent-kind",
+                )
+            )
+    return diagnostics
 
 
 def _sorted_declarations(analysis: DocumentAnalysis) -> list[DeclarationInfo]:

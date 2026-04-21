@@ -120,6 +120,26 @@ def test_analyze_document_returns_lint_diagnostics_for_current_document() -> Non
     assert [diag.code for diag in analysis.diagnostics] == ["hub-requires-business-key"]
 
 
+def test_analyze_document_returns_semantic_diagnostic_for_invalid_satellite_parent() -> None:
+    source = (
+        "namespace sales\n"
+        "hub Customer {\n  business_key customer_id: int\n}\n"
+        "satellite ParentDetails of Customer {\n  email: string\n}\n"
+        "satellite ChildDetails of ParentDetails {\n  status: string\n}\n"
+    )
+
+    analysis = analyze_document("file:///tmp/semantic.dv", source, version=2)
+
+    invalid_parent = [diag for diag in analysis.diagnostics if diag.code == "invalid-parent-kind"]
+
+    assert len(invalid_parent) == 1
+    assert "Invalid parent 'ParentDetails'" in invalid_parent[0].message
+    assert invalid_parent[0].range == types.Range(
+        start=types.Position(line=7, character=26),
+        end=types.Position(line=7, character=39),
+    )
+
+
 def test_refresh_document_caches_current_document_analysis() -> None:
     source = "namespace sales\nhub Customer {\n}\n"
 
@@ -202,6 +222,24 @@ def test_document_completions_return_same_document_references() -> None:
     items = document_completions(
         analysis,
         types.Position(line=7, character=character),
+    )
+
+    assert [item.label for item in items] == ["Customer"]
+
+
+def test_document_completions_exclude_satellites_for_satellite_parent_context() -> None:
+    source = (
+        "namespace sales\n"
+        "hub Customer {\n  business_key customer_id: int\n}\n"
+        "satellite CustomerDetails of Customer {\n  email: string\n}\n"
+        "satellite ChildDetails of Customer {\n  status: string\n}\n"
+    )
+    analysis = analyze_document("file:///tmp/semantic-completion.dv", source, version=1)
+    line = "satellite ChildDetails of Customer {"
+
+    items = document_completions(
+        analysis,
+        types.Position(line=7, character=line.index("Customer {") + len("Cust")),
     )
 
     assert [item.label for item in items] == ["Customer"]

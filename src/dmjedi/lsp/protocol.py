@@ -63,6 +63,24 @@ def lint_diagnostic_to_lsp(diagnostic: LintDiagnostic, source: str) -> types.Dia
     )
 
 
+def semantic_diagnostic(
+    *,
+    source: str,
+    line: int,
+    token: str,
+    message: str,
+    code: str,
+) -> types.Diagnostic:
+    """Build an LSP diagnostic for a semantic error anchored to a token on a line."""
+    return types.Diagnostic(
+        range=token_range_on_line(source, line, token),
+        message=message,
+        severity=types.DiagnosticSeverity.Error,
+        code=code,
+        source="dmjedi",
+    )
+
+
 def _parse_error_location(error: DVMLParseError) -> SourceLocation:
     return SourceLocation(
         file=error.error.file,
@@ -100,6 +118,25 @@ def block_range_from_location(source: str, location: SourceLocation) -> types.Ra
     return types.Range(
         start=types.Position(line=line_index, character=0),
         end=types.Position(line=end_line, character=len(lines[end_line])),
+    )
+
+
+def token_range_on_line(source: str, line: int, token: str) -> types.Range:
+    """Build a range for the first occurrence of a token on a given 1-based line."""
+    lines = source.splitlines()
+    line_index = max(line - 1, 0)
+    if line_index >= len(lines):
+        start = types.Position(line=line_index, character=0)
+        return types.Range(start=start, end=start)
+
+    line_text = lines[line_index]
+    start_character = line_text.find(token)
+    if start_character < 0:
+        start_character = 0
+
+    return types.Range(
+        start=types.Position(line=line_index, character=start_character),
+        end=types.Position(line=line_index, character=start_character + max(len(token), 1)),
     )
 
 
