@@ -295,3 +295,17 @@ def test_lsp_command_starts_server(monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert started == [True]
+
+
+def test_mcp_command_invokes_start_server(monkeypatch) -> None:
+    started: list[bool] = []
+
+    def fake_start_server() -> None:
+        started.append(True)
+
+    monkeypatch.setattr(cli_main, "start_mcp_server", fake_start_server)
+
+    result = runner.invoke(app, ["mcp"])
+
+    assert result.exit_code == 0
+    assert started == [True]
