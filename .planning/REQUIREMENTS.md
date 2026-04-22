@@ -36,10 +36,10 @@ Requirements for v0.2.0 milestone. Each maps to roadmap phases.
 
 ### LLM Integration
 
-- [ ] **LLM-01**: MCP server exposes validate tool for AI workflows
-- [ ] **LLM-02**: MCP server exposes generate tool for AI workflows
-- [ ] **LLM-03**: MCP server exposes model explanation tool for AI workflows
-- [ ] **LLM-04**: CLI supports `--format json` flag for structured output consumable by LLMs and CI/CD
+- [x] **LLM-01**: MCP server exposes validate tool for AI workflows
+- [x] **LLM-02**: MCP server exposes generate tool for AI workflows
+- [x] **LLM-03**: MCP server exposes model explanation tool for AI workflows
+- [x] **LLM-04**: CLI supports `--format json` flag for structured output consumable by LLMs and CI/CD
 
 ### Testing
 
@@ -114,10 +114,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LSP-04 | Phase 4: LSP Server | Pending |
 | LSP-05 | Phase 4: LSP Server | Pending |
 | LSP-06 | Phase 4: LSP Server | Pending |
-| LLM-01 | Phase 5: MCP Server & Structured Output | Pending |
-| LLM-02 | Phase 5: MCP Server & Structured Output | Pending |
-| LLM-03 | Phase 5: MCP Server & Structured Output | Pending |
-| LLM-04 | Phase 5: MCP Server & Structured Output | Pending |
+| LLM-01 | Phase 5: MCP Server & Structured Output | Complete |
+| LLM-02 | Phase 5: MCP Server & Structured Output | Complete |
+| LLM-03 | Phase 5: MCP Server & Structured Output | Complete |
+| LLM-04 | Phase 5: MCP Server & Structured Output | Complete |
 | STRM-01 | Phase 6: Streaming & Release | Pending |
 | STRM-02 | Phase 6: Streaming & Release | Pending |
 | REL-01 | Phase 6: Streaming & Release | Pending |

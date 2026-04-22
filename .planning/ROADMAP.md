@@ -85,6 +85,12 @@ Plans:
 **Requirements:** LLM-01, LLM-02, LLM-03, LLM-04
 **Depends on:** Phase 1 (CLI pipeline, parser, generators)
 **Gap Closure:** Closes 4 orphaned requirements from milestone audit
+**Plans:** 3 plans
+
+Plans:
+- [x] 05-01-PLAN.md — shared application request/result contracts, service-layer compiler adapters, and Wave 0 JSON/MCP test scaffolding
+- [ ] 05-02-PLAN.md — `--format json` CLI wiring for validate, generate, and docs with no JSON-mode disk writes
+- [ ] 05-03-PLAN.md — FastMCP stdio server, locked validate/generate/explain tool set, and `dmjedi mcp` entrypoint
 
 ### Success Criteria
 - MCP server starts and registers validate/generate/explain tools
