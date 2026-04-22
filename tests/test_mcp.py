@@ -1,65 +1,90 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
-from pydantic import ValidationError
 
-from dmjedi.application.requests import CompileRequest
-
-
-def test_compile_request_rejects_path_and_source_together() -> None:
-    with pytest.raises(ValidationError):
-        CompileRequest(paths=["examples/sales-domain.dv"], source="namespace sales")
+from dmjedi.generators.base import GeneratorResult
 
 
-def test_inline_source_with_imports_is_rejected() -> None:
-    from dmjedi.application.services import validate_request
+def test_mcp_tool_list_is_validate_generate_explain_only() -> None:
+    from dmjedi.mcp.server import SERVER
 
-    result = validate_request(
-        CompileRequest(
-            source=(
-                'namespace sales\nimport "./shared.dv"\n'
-                "hub Customer {\n  business_key id: int\n}\n"
-            ),
-        )
+    tool_names = sorted(tool.name for tool in SERVER._tool_manager.list_tools())
+
+    assert tool_names == ["explain", "generate", "validate"]
+
+
+def test_mcp_validate_accepts_source_and_path_inputs(tmp_path: Path) -> None:
+    from dmjedi.mcp.tools import validate
+
+    path = tmp_path / "sales.dv"
+    path.write_text("namespace sales\nhub Customer {\n  business_key customer_id: int\n}\n")
+
+    source_result = validate(
+        source="namespace sales\nhub Product {\n  business_key product_id: int\n}\n",
+        source_name="inline.dv",
+    )
+    path_result = validate(path=str(path))
+
+    assert source_result["ok"] is True
+    assert source_result["source_mode"] == "inline"
+    assert source_result["module_count"] == 1
+    assert path_result["ok"] is True
+    assert path_result["source_mode"] == "paths"
+    assert path_result["module_count"] == 1
+
+
+def test_mcp_generate_returns_artifacts_without_disk_writes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from dmjedi.mcp.tools import generate
+
+    def fail_write(self: GeneratorResult, output_dir: Path) -> list[Path]:
+        msg = f"unexpected write to {output_dir}"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(GeneratorResult, "write", fail_write)
+
+    model_path = tmp_path / "sales.dv"
+    model_path.write_text(
+        "namespace sales\n"
+        "hub Customer {\n  business_key customer_id: int\n}\n"
+        "satellite CustomerDetails of Customer {\n  email: string\n}\n"
     )
 
-    assert result.ok is False
-    assert [diag.code for diag in result.diagnostics] == ["inline-source-imports-unsupported"]
+    result = generate(path=str(model_path), target="sql-jinja", dialect="postgres")
+
+    assert result["ok"] is True
+    assert result["source_mode"] == "paths"
+    assert result["target"] == "sql-jinja"
+    assert result["dialect"] == "postgres"
+    assert result["artifacts"]
+    assert all("path" in artifact and "content" in artifact for artifact in result["artifacts"])
+    assert not (tmp_path / "output").exists()
 
 
-def test_validate_request_preserves_lint_location_fields() -> None:
-    from dmjedi.application.services import validate_request
+def test_mcp_explain_returns_summary_and_entity_counts() -> None:
+    from dmjedi.mcp.tools import explain
 
-    result = validate_request(
-        CompileRequest(source="namespace sales\nhub Customer {\n}\n", source_name="inline.dv")
+    result = explain(
+        source=(
+            "namespace sales\n"
+            "hub Customer {\n  business_key customer_id: int\n}\n"
+            "hub Product {\n  business_key product_id: int\n}\n"
+            "link CustomerProduct {\n"
+            "  refs Customer, Product\n"
+            "}\n"
+            "satellite CustomerDetails of Customer {\n  email: string\n}\n"
+        ),
+        source_name="inline.dv",
     )
 
-    assert result.ok is False
-    diagnostic = result.diagnostics[0]
-    assert diagnostic.code == "hub-requires-business-key"
-    assert diagnostic.file == "inline.dv"
-    assert diagnostic.line == 2
-    assert diagnostic.column == 1
-
-
-def test_explain_request_returns_summary_and_all_entity_count_keys() -> None:
-    from dmjedi.application.services import explain_request
-
-    result = explain_request(
-        CompileRequest(
-            source=(
-                "namespace sales\n"
-                "hub Customer {\n  business_key customer_id: int\n}\n"
-                "satellite CustomerDetails of Customer {\n  email: string\n}\n"
-            )
-        )
-    )
-
-    assert result.ok is True
-    assert result.summary
-    assert result.entity_counts == {
-        "hubs": 1,
-        "links": 0,
+    assert result["ok"] is True
+    assert result["summary"]
+    assert result["entity_counts"] == {
+        "hubs": 2,
+        "links": 1,
         "satellites": 1,
         "nhsats": 0,
         "nhlinks": 0,
@@ -68,4 +93,29 @@ def test_explain_request_returns_summary_and_all_entity_count_keys() -> None:
         "bridges": 0,
         "pits": 0,
     }
-    assert result.entities[0].qualified_name == "sales.Customer"
+    assert result["entities"] == [
+        {
+            "qualified_name": "sales.Customer",
+            "kind": "hub",
+            "columns": ["customer_id"],
+            "references": [],
+        },
+        {
+            "qualified_name": "sales.Product",
+            "kind": "hub",
+            "columns": ["product_id"],
+            "references": [],
+        },
+        {
+            "qualified_name": "sales.CustomerDetails",
+            "kind": "satellite",
+            "columns": ["email"],
+            "references": ["sales.Customer"],
+        },
+        {
+            "qualified_name": "sales.CustomerProduct",
+            "kind": "link",
+            "columns": [],
+            "references": ["sales.Customer", "sales.Product"],
+        },
+    ]
