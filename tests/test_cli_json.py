@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
+from dmjedi.cli.main import app
 from dmjedi.application.requests import CompileRequest
 from dmjedi.application.results import GenerateResult, ValidateResult
 from dmjedi.generators.base import GeneratorResult
+
+runner = CliRunner()
 
 
 def test_validate_result_json_schema() -> None:
@@ -98,3 +103,45 @@ def test_docs_request_returns_model_markdown_artifact() -> None:
     assert result.ok is True
     assert result.artifacts[0].path == "model.md"
     assert "# Data Vault Model Documentation" in result.artifacts[0].content
+
+
+def test_validate_json_failure_exit_code_and_payload(tmp_path: Path) -> None:
+    bad_dv = tmp_path / "bad.dv"
+    bad_dv.write_text("namespace test\nhub Empty {\n}\n")
+
+    result = runner.invoke(app, ["validate", str(bad_dv), "--format", "json"])
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is False
+    assert payload["source_mode"] == "paths"
+    assert payload["diagnostics"]
+    assert payload["diagnostics"][0]["code"] == "hub-requires-business-key"
+
+
+def test_generate_json_returns_artifacts_without_writing_output_dir(tmp_path: Path) -> None:
+    output_dir = tmp_path / "generated"
+
+    result = runner.invoke(
+        app,
+        [
+            "generate",
+            "tests/fixtures/sales.dv",
+            "--target",
+            "sql-jinja",
+            "--dialect",
+            "postgres",
+            "--output",
+            str(output_dir),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is True
+    assert payload["target"] == "sql-jinja"
+    assert payload["dialect"] == "postgres"
+    assert payload["artifacts"]
+    assert output_dir.exists() is False
