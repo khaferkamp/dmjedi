@@ -416,7 +416,7 @@ def _build_satellite_entities(
             qualified_name=satellite.qualified_name,
             kind=kind,
             columns=[column.name for column in satellite.columns],
-            references=[satellite.parent_ref],
+            references=[_qualify_reference(satellite.parent_ref, satellite.namespace)],
         )
         for satellite in sorted(satellites, key=lambda item: item.qualified_name)
     ]
@@ -428,7 +428,7 @@ def _build_link_entities(links: object, kind: str = "link") -> list[ExplainEntit
             qualified_name=link.qualified_name,
             kind=kind,
             columns=[column.name for column in link.columns],
-            references=list(link.hub_references),
+            references=[_qualify_reference(reference, link.namespace) for reference in link.hub_references],
         )
         for link in sorted(links, key=lambda item: item.qualified_name)
     ]
@@ -440,7 +440,10 @@ def _build_samlink_entities(samlinks: object) -> list[ExplainEntityResult]:
             qualified_name=samlink.qualified_name,
             kind="samlink",
             columns=[column.name for column in samlink.columns],
-            references=[samlink.master_ref, samlink.duplicate_ref],
+            references=[
+                _qualify_reference(samlink.master_ref, samlink.namespace),
+                _qualify_reference(samlink.duplicate_ref, samlink.namespace),
+            ],
         )
         for samlink in sorted(samlinks, key=lambda item: item.qualified_name)
     ]
@@ -452,7 +455,7 @@ def _build_bridge_entities(bridges: object) -> list[ExplainEntityResult]:
             qualified_name=bridge.qualified_name,
             kind="bridge",
             columns=[],
-            references=list(bridge.path),
+            references=[_qualify_reference(reference, bridge.namespace) for reference in bridge.path],
         )
         for bridge in sorted(bridges, key=lambda item: item.qualified_name)
     ]
@@ -464,7 +467,16 @@ def _build_pit_entities(pits: object) -> list[ExplainEntityResult]:
             qualified_name=pit.qualified_name,
             kind="pit",
             columns=[],
-            references=[pit.anchor_ref, *pit.tracked_satellites],
+            references=[
+                _qualify_reference(pit.anchor_ref, pit.namespace),
+                *[_qualify_reference(reference, pit.namespace) for reference in pit.tracked_satellites],
+            ],
         )
         for pit in sorted(pits, key=lambda item: item.qualified_name)
     ]
+
+
+def _qualify_reference(reference: str, namespace: str) -> str:
+    if "." in reference or not namespace:
+        return reference
+    return f"{namespace}.{reference}"

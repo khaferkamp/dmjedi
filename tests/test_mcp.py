@@ -73,7 +73,7 @@ def test_mcp_explain_returns_summary_and_entity_counts() -> None:
             "hub Customer {\n  business_key customer_id: int\n}\n"
             "hub Product {\n  business_key product_id: int\n}\n"
             "link CustomerProduct {\n"
-            "  refs Customer, Product\n"
+            "  references Customer, Product\n"
             "}\n"
             "satellite CustomerDetails of Customer {\n  email: string\n}\n"
         ),
@@ -101,12 +101,6 @@ def test_mcp_explain_returns_summary_and_entity_counts() -> None:
             "references": [],
         },
         {
-            "qualified_name": "sales.Product",
-            "kind": "hub",
-            "columns": ["product_id"],
-            "references": [],
-        },
-        {
             "qualified_name": "sales.CustomerDetails",
             "kind": "satellite",
             "columns": ["email"],
@@ -117,5 +111,11 @@ def test_mcp_explain_returns_summary_and_entity_counts() -> None:
             "kind": "link",
             "columns": [],
             "references": ["sales.Customer", "sales.Product"],
+        },
+        {
+            "qualified_name": "sales.Product",
+            "kind": "hub",
+            "columns": ["product_id"],
+            "references": [],
         },
     ]
