@@ -120,47 +120,25 @@ def generate(
 def docs(
     paths: list[Path] = typer.Argument(..., help="DVML files or directories"),
     output: Path = typer.Option("output/docs", "--output", "-o", help="Output directory"),
+    format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
     """Generate markdown documentation from DVML models."""
     console = Console(stderr=True)
-    modules = _parse_all(paths, console)
+    output_format = _parse_output_format(format, console)
+    result = docs_request(CompileRequest(paths=paths))
 
-    # Lint
-    all_diagnostics = []
-    for module in modules:
-        all_diagnostics.extend(lint(module))
-    error_count = sum(1 for d in all_diagnostics if d.severity == Severity.ERROR)
-    if all_diagnostics:
-        print_diagnostics(all_diagnostics, console)
-    if error_count > 0:
+    if output_format == "json":
+        typer.echo(result.model_dump_json(indent=2))
+        if not result.ok:
+            raise typer.Exit(code=1)
+        return
+
+    _print_result_diagnostics(result.diagnostics, console)
+    if not result.ok:
         raise typer.Exit(code=1)
 
-    try:
-        model = resolve(modules)
-    except ResolverErrors as e:
-        for err in e.errors:
-            loc = f"{err.source_file}:{err.line} " if err.source_file else ""
-            console.print(f"[red]E[/red] {loc}{err.message}")
-        raise typer.Exit(code=1) from None
-
-    # Post-resolve lint for model-aware rules (LINT-01 effsat parent check)
-    post_resolve_diags: list[LintDiagnostic] = []
-    for module in modules:
-        post_resolve_diags.extend(lint(module, model=model))
-    model_aware_diags = [
-        d for d in post_resolve_diags if d.rule in ("effsat-parent-must-be-link",)
-    ]
-    if model_aware_diags:
-        print_diagnostics(model_aware_diags, console)
-    model_aware_error_count = sum(1 for d in model_aware_diags if d.severity == Severity.ERROR)
-    if model_aware_error_count > 0:
-        raise typer.Exit(code=1)
-
-    markdown = generate_markdown(model)
-
-    output.mkdir(parents=True, exist_ok=True)
-    doc_path = output / "model.md"
-    doc_path.write_text(markdown)
+    written = _write_artifacts(result.artifacts, output)
+    doc_path = written[0] if written else output / "model.md"
     console.print(f"[green]Documentation written to {doc_path}[/green]")
 
 
