@@ -145,3 +145,31 @@ def test_generate_json_returns_artifacts_without_writing_output_dir(tmp_path: Pa
     assert payload["dialect"] == "postgres"
     assert payload["artifacts"]
     assert output_dir.exists() is False
+
+
+def test_docs_json_returns_model_markdown_without_writing_output_dir(tmp_path: Path) -> None:
+    output_dir = tmp_path / "docs"
+
+    result = runner.invoke(
+        app,
+        [
+            "docs",
+            "tests/fixtures/sales.dv",
+            "--output",
+            str(output_dir),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is True
+    assert payload["artifacts"] == [
+        {
+            "path": "model.md",
+            "content": payload["artifacts"][0]["content"],
+        }
+    ]
+    assert "# Data Vault Model Documentation" in payload["artifacts"][0]["content"]
+    assert output_dir.exists() is False
