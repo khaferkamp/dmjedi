@@ -17,7 +17,7 @@ class CompileRequest(BaseModel):
     source_name: str = "<string>"
 
     @model_validator(mode="after")
-    def validate_input_mode(self) -> "CompileRequest":
+    def validate_input_mode(self) -> CompileRequest:
         has_paths = bool(self.paths)
         has_source = self.source is not None and self.source != ""
 
@@ -30,4 +30,3 @@ class CompileRequest(BaseModel):
     @property
     def source_mode(self) -> str:
         return "paths" if self.paths else "inline"
-
