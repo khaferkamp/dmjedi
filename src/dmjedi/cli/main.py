@@ -15,7 +15,8 @@ from dmjedi.cli.errors import format_lint_diagnostic, print_diagnostics
 from dmjedi.generators.base import GeneratorResult
 from dmjedi.lang.ast import SourceLocation
 from dmjedi.lang.linter import LintDiagnostic, Severity
-from dmjedi.lsp.server import start_server
+from dmjedi.lsp.server import start_server as start_lsp_server
+from dmjedi.mcp.server import start_server as start_mcp_server
 
 app = typer.Typer(
     name="dmjedi",
@@ -31,6 +32,9 @@ _STRUCTURED_ERROR_CODES = {
     "path-error",
     "resolver-error",
 }
+
+# Preserve the existing LSP test seam while the CLI exposes multiple server entrypoints.
+start_server = start_lsp_server
 
 
 @app.command()
@@ -146,6 +150,12 @@ def docs(
 def lsp() -> None:
     """Start the DVML Language Server."""
     start_server()
+
+
+@app.command()
+def mcp() -> None:
+    """Start the DMJedi MCP server."""
+    start_mcp_server()
 
 
 def _parse_output_format(value: str, console: Console) -> str:
