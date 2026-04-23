@@ -30,6 +30,7 @@ def test_generate_result_artifact_shape() -> None:
         source_mode="paths",
         target="sql-jinja",
         dialect="postgres",
+        mode="batch",
         module_count=1,
         diagnostics=[],
         artifacts=[
@@ -86,10 +87,12 @@ def test_generate_request_returns_artifacts_without_writing(
         CompileRequest(paths=[Path("tests/fixtures/sales.dv")]),
         target="sql-jinja",
         dialect="postgres",
+        mode="batch",
     )
 
     assert result.ok is True
     assert result.target == "sql-jinja"
+    assert result.mode == "batch"
     assert result.artifacts
     assert all(artifact.path for artifact in result.artifacts)
     assert all(artifact.content for artifact in result.artifacts)
@@ -143,6 +146,7 @@ def test_generate_json_returns_artifacts_without_writing_output_dir(tmp_path: Pa
     assert payload["ok"] is True
     assert payload["target"] == "sql-jinja"
     assert payload["dialect"] == "postgres"
+    assert payload["mode"] == "batch"
     assert payload["artifacts"]
     assert output_dir.exists() is False
 

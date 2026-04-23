@@ -222,6 +222,7 @@ def test_spark_hub_output_functional():
     assert 'F.lit("dmjedi").alias("record_source")' in code
     assert ".distinct()" in code
     assert "customer_id" in code
+    assert 'dlt.read("src_Customer")' in code
     # No stubs
     lines = [ln.strip() for ln in code.splitlines()]
     assert "pass" not in lines
@@ -237,6 +238,7 @@ def test_spark_satellite_output_functional():
     assert "Customer_hk" in code
     assert "hash_diff" in code
     assert "first_name" in code
+    assert 'dlt.read("src_CustomerDetails")' in code
     lines = [ln.strip() for ln in code.splitlines()]
     assert "pass" not in lines
     assert not any("TODO" in ln for ln in lines)
@@ -251,9 +253,34 @@ def test_spark_link_output_functional():
     assert "Customer_hk" in code
     assert "Product_hk" in code
     assert 'F.sha2(F.concat_ws("||"' in code
+    assert 'dlt.read("src_CustomerProduct")' in code
     lines = [ln.strip() for ln in code.splitlines()]
     assert "pass" not in lines
     assert not any("TODO" in ln for ln in lines)
+
+
+def test_spark_hub_output_streaming():
+    gen = registry.get("spark-declarative", mode="streaming")
+    result = gen.generate(_sample_model())
+    code = result.files["hubs/Customer.py"]
+    assert 'dlt.read_stream("src_Customer")' in code
+    assert 'dlt.read("src_Customer")' not in code
+
+
+def test_spark_satellite_output_streaming():
+    gen = registry.get("spark-declarative", mode="streaming")
+    result = gen.generate(_sample_model())
+    code = result.files["satellites/CustomerDetails.py"]
+    assert 'dlt.read_stream("src_CustomerDetails")' in code
+    assert 'dlt.read("src_CustomerDetails")' not in code
+
+
+def test_spark_link_output_streaming():
+    gen = registry.get("spark-declarative", mode="streaming")
+    result = gen.generate(_sample_model())
+    code = result.files["links/CustomerProduct.py"]
+    assert 'dlt.read_stream("src_CustomerProduct")' in code
+    assert 'dlt.read("src_CustomerProduct")' not in code
 
 
 def test_spark_link_no_extra_columns():

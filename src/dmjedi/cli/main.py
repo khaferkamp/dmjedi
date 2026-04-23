@@ -25,6 +25,7 @@ app = typer.Typer(
 )
 
 _OUTPUT_FORMATS = {"text", "json"}
+_GENERATOR_MODES = {"batch", "streaming"}
 _STRUCTURED_ERROR_CODES = {
     "generator-error",
     "import-error",
@@ -65,6 +66,7 @@ def generate(
     paths: list[Path] = typer.Argument(..., help="DVML files or directories"),
     target: str = typer.Option("spark-declarative", "--target", "-t", help="Generator target"),
     output: Path = typer.Option("output", "--output", "-o", help="Output directory"),
+    mode: str = typer.Option("batch", "--mode", help="Generator mode: batch or streaming."),
     dialect: str = typer.Option(
         "default",
         "--dialect",
@@ -75,6 +77,7 @@ def generate(
     """Generate pipeline code from DVML models."""
     console = Console(stderr=True)
     output_format = _parse_output_format(format, console)
+    generator_mode = _parse_generator_mode(mode, console)
 
     # Validate dialect against supported dialects from type mapping (D-08)
     from dmjedi.model.types import SUPPORTED_DIALECTS
@@ -85,6 +88,7 @@ def generate(
             source_mode="paths",
             target=target,
             dialect=dialect,
+            mode=generator_mode,
             diagnostics=[
                 DiagnosticResult(
                     severity=Severity.ERROR.value,
@@ -97,7 +101,12 @@ def generate(
             ],
         )
     else:
-        result = generate_request(CompileRequest(paths=paths), target=target, dialect=dialect)
+        result = generate_request(
+            CompileRequest(paths=paths),
+            target=target,
+            dialect=dialect,
+            mode=generator_mode,
+        )
 
     if output_format == "json":
         typer.echo(result.model_dump_json(indent=2))
@@ -163,6 +172,14 @@ def _parse_output_format(value: str, console: Console) -> str:
         return value
 
     console.print("[red]Error:[/red] Invalid format. Choose from: text, json")
+    raise typer.Exit(code=1)
+
+
+def _parse_generator_mode(value: str, console: Console) -> str:
+    if value in _GENERATOR_MODES:
+        return value
+
+    console.print("[red]Error:[/red] Invalid mode. Choose from: batch, streaming")
     raise typer.Exit(code=1)
 
 

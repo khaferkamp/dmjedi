@@ -64,6 +64,19 @@ def test_mcp_generate_returns_artifacts_without_disk_writes(
     assert not (tmp_path / "output").exists()
 
 
+def test_mcp_generate_accepts_mode(tmp_path: Path) -> None:
+    from dmjedi.mcp.tools import generate
+
+    model_path = tmp_path / "sales.dv"
+    model_path.write_text("namespace sales\nhub Customer {\n  business_key customer_id: int\n}\n")
+
+    result = generate(path=str(model_path), target="spark-declarative", mode="streaming")
+
+    assert result["ok"] is True
+    assert result["mode"] == "streaming"
+    assert result["target"] == "spark-declarative"
+
+
 def test_mcp_explain_returns_summary_and_entity_counts() -> None:
     from dmjedi.mcp.tools import explain
 

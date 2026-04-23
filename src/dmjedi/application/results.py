@@ -31,6 +31,7 @@ class GenerateResult(BaseModel):
     source_mode: str
     target: str
     dialect: str
+    mode: str
     module_count: int = 0
     diagnostics: list[DiagnosticResult] = Field(default_factory=list)
     artifacts: list[ArtifactResult] = Field(default_factory=list)

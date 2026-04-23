@@ -27,10 +27,11 @@ def generate(
     source_name: str = "<string>",
     target: str = "spark-declarative",
     dialect: str = "default",
+    mode: str = "batch",
 ) -> dict[str, object]:
     """Generate in-memory artifacts from inline source or a filesystem path."""
     request = _build_request(source=source, path=path, source_name=source_name)
-    result = generate_request(request, target=target, dialect=dialect)
+    result = generate_request(request, target=target, dialect=dialect, mode=mode)
     return result.model_dump(mode="json")
 
 

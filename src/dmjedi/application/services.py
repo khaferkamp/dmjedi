@@ -47,7 +47,7 @@ def validate_request(request: CompileRequest) -> ValidateResult:
     )
 
 
-def generate_request(request: CompileRequest, target: str, dialect: str) -> GenerateResult:
+def generate_request(request: CompileRequest, target: str, dialect: str, mode: str) -> GenerateResult:
     """Generate artifacts in-memory without writing to disk."""
     loaded = _load_modules(request)
     if loaded.diagnostics:
@@ -56,6 +56,7 @@ def generate_request(request: CompileRequest, target: str, dialect: str) -> Gene
             source_mode=request.source_mode,
             target=target,
             dialect=dialect,
+            mode=mode,
             module_count=len(loaded.modules),
             diagnostics=loaded.diagnostics,
             artifacts=[],
@@ -68,19 +69,21 @@ def generate_request(request: CompileRequest, target: str, dialect: str) -> Gene
             source_mode=request.source_mode,
             target=target,
             dialect=dialect,
+            mode=mode,
             module_count=len(loaded.modules),
             diagnostics=compiled.diagnostics,
             artifacts=[],
         )
 
     try:
-        generator = registry.get(target, dialect=dialect)
+        generator = registry.get(target, dialect=dialect, mode=mode)
     except KeyError as err:
         return GenerateResult(
             ok=False,
             source_mode=request.source_mode,
             target=target,
             dialect=dialect,
+            mode=mode,
             module_count=len(loaded.modules),
             diagnostics=[
                 DiagnosticResult(
@@ -102,6 +105,7 @@ def generate_request(request: CompileRequest, target: str, dialect: str) -> Gene
         source_mode=request.source_mode,
         target=target,
         dialect=dialect,
+        mode=mode,
         module_count=len(loaded.modules),
         diagnostics=compiled.diagnostics,
         artifacts=artifacts,

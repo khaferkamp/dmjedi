@@ -80,6 +80,43 @@ def test_generate_nonexistent_file() -> None:
     assert "not found" in result.output.lower()
 
 
+def test_generate_streaming_mode(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "generate",
+            "examples/sales-domain.dv",
+            "--target",
+            "spark-declarative",
+            "--mode",
+            "streaming",
+            "--output",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 0
+    generated_files = list(tmp_path.rglob("*.py"))
+    assert generated_files
+
+
+def test_generate_invalid_mode(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "generate",
+            "examples/sales-domain.dv",
+            "--target",
+            "spark-declarative",
+            "--mode",
+            "invalid",
+            "--output",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 1
+    assert "Invalid mode" in result.output
+
+
 # --- docs command ---
 
 
@@ -215,6 +252,7 @@ def test_cli_dialect_in_help() -> None:
     result = runner.invoke(app, ["generate", "--help"])
     assert result.exit_code == 0
     assert "--dialect" in result.output
+    assert "--mode" in result.output
     assert "default" in result.output
 
 

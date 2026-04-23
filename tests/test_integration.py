@@ -106,6 +106,29 @@ def test_e2e_spark_pipeline():
         compile(code, filename, "exec")
 
 
+def test_e2e_spark_streaming_pipeline():
+    """Full pipeline: .dv file -> parse -> resolve -> streaming Spark DLT generation."""
+    module = parse_file(Path("examples/sales-domain.dv"))
+    model = resolve([module])
+
+    gen = registry.get("spark-declarative", mode="streaming")
+    result = gen.generate(model)
+
+    assert len(result.files) == 8, f"Expected 8 files, got {sorted(result.files.keys())}"
+
+    for filename, code in result.files.items():
+        assert "import dlt" in code, f"{filename} missing 'import dlt'"
+        assert "@dlt.table" in code, f"{filename} missing '@dlt.table'"
+        lines = [ln.strip() for ln in code.splitlines()]
+        assert "pass" not in lines, f"{filename} contains 'pass' stub"
+        assert not any("TODO" in ln for ln in lines), f"{filename} contains TODO"
+        compile(code, filename, "exec")
+
+    assert 'dlt.read_stream("src_Customer")' in result.files["hubs/Customer.py"]
+    assert 'dlt.read_stream("src_CustomerDetails")' in result.files["satellites/CustomerDetails.py"]
+    assert 'dlt.read_stream("src_Sale")' in result.files["links/Sale.py"]
+
+
 def test_e2e_docs_pipeline():
     """Full pipeline: .dv file -> parse -> resolve -> markdown documentation."""
     module = parse_file(Path("examples/sales-domain.dv"))
@@ -171,6 +194,23 @@ def test_e2e_write_to_disk(tmp_path: Path):
     first_rel = next(iter(result.files))
     first_path = tmp_path / first_rel
     assert first_path.read_text() == result.files[first_rel]
+
+
+def test_generated_example_matrix_exists() -> None:
+    generated_root = Path("examples/generated")
+    expected_dirs = [
+        "duckdb",
+        "databricks",
+        "postgres",
+        "spark-batch",
+        "spark-streaming",
+    ]
+
+    assert generated_root.exists()
+    for name in expected_dirs:
+        target_dir = generated_root / name
+        assert target_dir.exists(), f"missing generated example dir: {target_dir}"
+        assert any(target_dir.rglob("*")), f"generated example dir is empty: {target_dir}"
 
 
 def test_e2e_duckdb_behavioral_sql_flow(duckdb_generated_result, all_entity_source_rows):
