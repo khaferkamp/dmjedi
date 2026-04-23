@@ -1,5 +1,7 @@
 # DMJEDI — Data Modeling Jedi
 
+![DMJedi logo, colored](./img/dmjedi-logo-colored.png)
+
 **CLI for Data Vault 2.1 modeling and data warehouse automation.**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
@@ -114,8 +116,8 @@ DMJEDI validates models at three levels:
 
 | Target | Flag | Output |
 |--------|------|--------|
-| SQL (Jinja2) | `--target sql-jinja --dialect duckdb|databricks|postgres` | Dialect-specific `CREATE TABLE` DDL and staging views |
-| Spark DLT | `--target spark-declarative --mode batch|streaming` | Databricks DLT Python files with batch or streaming source reads |
+| SQL (Jinja2) | `--target sql-jinja --dialect DIALECT` | Dialect-specific `CREATE TABLE` DDL and staging views |
+| Spark DLT | `--target spark-declarative --mode MODE` | Databricks DLT Python files with batch or streaming source reads |
 
 SQL generation supports type mapping across dialects (`duckdb`, `databricks`, `postgres`) and Spark Declarative supports both `batch` and `streaming` modes.
 
