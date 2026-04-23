@@ -1,6 +1,6 @@
 # DMJEDI — Data Modeling Jedi
 
-![DMJedi logo, colored](./img/dmjedi-logo-colored.png)
+![DMJedi logo](./img/dmjedi-logo.svg)
 
 **CLI for Data Vault 2.1 modeling and data warehouse automation.**
 
