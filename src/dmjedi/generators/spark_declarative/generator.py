@@ -1,5 +1,7 @@
 """Generator for Databricks Spark Declarative Pipelines (DLT)."""
 
+from typing import Any
+
 from dmjedi.generators.base import BaseGenerator, GeneratorResult
 from dmjedi.model.core import (
     Bridge,
@@ -25,6 +27,9 @@ _IMPORTS_VIEW = (
 
 
 class SparkDeclarativeGenerator(BaseGenerator):
+    def __init__(self, mode: str = "batch", **kwargs: Any) -> None:
+        self._mode = mode
+
     @property
     def name(self) -> str:
         return "spark-declarative"
@@ -78,7 +83,7 @@ class SparkDeclarativeGenerator(BaseGenerator):
             f")\n"
             f"def {table_name}():\n"
             f'    """Hub entity with business keys: {bk_doc}."""\n'
-            f'    df = dlt.read("src_{hub.name}")\n'
+            f'    df = {self._source_read(f"src_{hub.name}")}\n'
             f"    return df.select(\n"
             f'        F.sha2(F.concat_ws("||", {bk_concat}), 256).alias("{hub.name}_hk"),\n'
             f'        F.current_timestamp().alias("load_ts"),\n'
@@ -115,7 +120,7 @@ class SparkDeclarativeGenerator(BaseGenerator):
             f")\n"
             f"def {table_name}():\n"
             f'    """Satellite entity attached to {sat.parent_ref}."""\n'
-            f'    df = dlt.read("src_{sat.name}")\n'
+            f'    df = {self._source_read(f"src_{sat.name}")}\n'
             f"    return df.select(\n"
             f'        F.col("{sat.parent_ref}_hk"),\n'
             f'        F.current_timestamp().alias("load_ts"),\n'
@@ -144,7 +149,7 @@ class SparkDeclarativeGenerator(BaseGenerator):
             f")\n"
             f"def {table_name}():\n"
             f'    """Link entity referencing: {refs_doc}."""\n'
-            f'    df = dlt.read("src_{link.name}")\n'
+            f'    df = {self._source_read(f"src_{link.name}")}\n'
             f"    return df.select(\n"
             f'        F.sha2(F.concat_ws("||", {ref_concat}), 256)'
             f'.alias("{link.name}_hk"),\n'
@@ -250,6 +255,11 @@ class SparkDeclarativeGenerator(BaseGenerator):
     def _table_ref(self, name: str) -> str:
         """Return the unqualified table name for DLT reads (strips namespace prefix)."""
         return name.split(".")[-1]
+
+    def _source_read(self, source_name: str) -> str:
+        if self._mode == "streaming":
+            return f'dlt.read_stream("{source_name}")'
+        return f'dlt.read("{source_name}")'
 
     def _generate_bridge(self, bridge: Bridge) -> str:
         view_name = f"bridge_{bridge.name}"

@@ -1,7 +1,10 @@
 """End-to-end integration tests for the DMJEDI pipeline."""
 
+from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 
+import duckdb
 import pytest
 
 from dmjedi.docs.markdown import generate_markdown
@@ -11,6 +14,16 @@ from dmjedi.lang.linter import Severity, lint
 from dmjedi.lang.parser import parse, parse_file
 from dmjedi.model.core import Column, DataVaultModel, Hub, Link, Satellite
 from dmjedi.model.resolver import ResolverErrors, resolve
+from tests.fixtures.all_entity_rows import (
+    CUSTOMER_MATCH_1001_HK,
+    CUSTOMER_1001_HK,
+    CUSTOMER_1002_HK,
+    CUSTOMER_PRODUCT_1001_2001_HK,
+    CUSTOMER_PRODUCT_1002_2002_HK,
+    PRODUCT_2001_HK,
+    PRODUCT_2002_HK,
+)
+from tests.helpers.sql_execution import execute_sql_files, fetch_all, load_source_tables
 
 
 def _sample_model() -> DataVaultModel:
@@ -60,12 +73,18 @@ def test_e2e_sql_pipeline():
     gen = registry.get("sql-jinja")
     result = gen.generate(model)
 
-    assert len(result.files) == 8, f"Expected 8 files, got {sorted(result.files.keys())}"
+    ddl_files = {k: v for k, v in result.files.items() if not k.startswith("staging/")}
+    assert len(ddl_files) == 8, f"Expected 8 DDL files, got {sorted(ddl_files.keys())}"
 
-    for filename, sql in result.files.items():
+    for filename, sql in ddl_files.items():
         assert "CREATE TABLE" in sql, f"{filename} missing CREATE TABLE"
         stripped = sql.replace(" ", "").replace("\n", "")
         assert ",)" not in stripped, f"{filename} has trailing comma before )"
+
+    staging_files = {k: v for k, v in result.files.items() if k.startswith("staging/")}
+    assert len(staging_files) == 8, f"Expected 8 staging files, got {sorted(staging_files.keys())}"
+    for filename, sql in staging_files.items():
+        assert "CREATE OR REPLACE VIEW" in sql, f"{filename} missing CREATE OR REPLACE VIEW"
 
 
 def test_e2e_spark_pipeline():
@@ -85,6 +104,29 @@ def test_e2e_spark_pipeline():
         assert "pass" not in lines, f"{filename} contains 'pass' stub"
         assert not any("TODO" in ln for ln in lines), f"{filename} contains TODO"
         compile(code, filename, "exec")
+
+
+def test_e2e_spark_streaming_pipeline():
+    """Full pipeline: .dv file -> parse -> resolve -> streaming Spark DLT generation."""
+    module = parse_file(Path("examples/sales-domain.dv"))
+    model = resolve([module])
+
+    gen = registry.get("spark-declarative", mode="streaming")
+    result = gen.generate(model)
+
+    assert len(result.files) == 8, f"Expected 8 files, got {sorted(result.files.keys())}"
+
+    for filename, code in result.files.items():
+        assert "import dlt" in code, f"{filename} missing 'import dlt'"
+        assert "@dlt.table" in code, f"{filename} missing '@dlt.table'"
+        lines = [ln.strip() for ln in code.splitlines()]
+        assert "pass" not in lines, f"{filename} contains 'pass' stub"
+        assert not any("TODO" in ln for ln in lines), f"{filename} contains TODO"
+        compile(code, filename, "exec")
+
+    assert 'dlt.read_stream("src_Customer")' in result.files["hubs/Customer.py"]
+    assert 'dlt.read_stream("src_CustomerDetails")' in result.files["satellites/CustomerDetails.py"]
+    assert 'dlt.read_stream("src_Sale")' in result.files["links/Sale.py"]
 
 
 def test_e2e_docs_pipeline():
@@ -152,6 +194,225 @@ def test_e2e_write_to_disk(tmp_path: Path):
     first_rel = next(iter(result.files))
     first_path = tmp_path / first_rel
     assert first_path.read_text() == result.files[first_rel]
+
+
+def test_generated_example_matrix_exists() -> None:
+    generated_root = Path("examples/generated")
+    expected_dirs = [
+        "duckdb",
+        "databricks",
+        "postgres",
+        "spark-batch",
+        "spark-streaming",
+    ]
+
+    assert generated_root.exists()
+    for name in expected_dirs:
+        target_dir = generated_root / name
+        assert target_dir.exists(), f"missing generated example dir: {target_dir}"
+        assert any(target_dir.rglob("*")), f"generated example dir is empty: {target_dir}"
+
+
+def test_e2e_duckdb_behavioral_sql_flow(duckdb_generated_result, all_entity_source_rows):
+    """Generated DuckDB SQL should produce observable rows from canonical source data."""
+    conn = duckdb.connect(":memory:")
+    try:
+        load_source_tables(conn, all_entity_source_rows)
+        _create_non_historized_targets(conn)
+        _execute_all_generated_duckdb_files(conn, duckdb_generated_result.files)
+        _load_historized_targets(conn)
+
+        customer_rows = fetch_all(
+            conn,
+            'SELECT "Customer_hk", "customer_id" FROM "Customer" ORDER BY "customer_id"',
+        )
+        assert customer_rows == [
+            (CUSTOMER_1001_HK, 1001),
+            (CUSTOMER_1002_HK, 1002),
+        ]
+
+        satellite_rows = fetch_all(
+            conn,
+            'SELECT "Customer_hk", "first_name", "last_name", "email" '
+            'FROM "CustomerDetails" ORDER BY "email"',
+        )
+        assert satellite_rows == [
+            (CUSTOMER_1001_HK, "Ana", "Nguyen", "ana.nguyen@example.com"),
+            (CUSTOMER_1002_HK, "Ben", "Patel", "ben.patel@example.com"),
+        ]
+
+        link_rows = fetch_all(
+            conn,
+            'SELECT "CustomerProduct_hk", "Customer_hk", "Product_hk", "quantity" '
+            'FROM "CustomerProduct" ORDER BY "quantity" DESC, "CustomerProduct_hk"',
+        )
+        assert link_rows == [
+            (CUSTOMER_PRODUCT_1001_2001_HK, CUSTOMER_1001_HK, PRODUCT_2001_HK, 2),
+            (CUSTOMER_PRODUCT_1002_2002_HK, CUSTOMER_1002_HK, PRODUCT_2002_HK, 1),
+        ]
+
+        nhsat_rows = fetch_all(
+            conn,
+            'SELECT "Customer_hk", "status", "updated_at" '
+            'FROM "CurrentStatus" ORDER BY "status"',
+        )
+        assert nhsat_rows == [
+            (CUSTOMER_1001_HK, "active", datetime(2026, 1, 5, 9, 30, 0)),
+            (CUSTOMER_1002_HK, "trial", datetime(2026, 1, 6, 14, 45, 0)),
+        ]
+
+        nhlink_rows = fetch_all(
+            conn,
+            'SELECT "ActiveRelation_hk", "Customer_hk", "Product_hk", "score" '
+            'FROM "ActiveRelation" ORDER BY "score" DESC',
+        )
+        assert nhlink_rows == [
+            (
+                CUSTOMER_PRODUCT_1001_2001_HK,
+                CUSTOMER_1001_HK,
+                PRODUCT_2001_HK,
+                Decimal("0.980000"),
+            ),
+            (
+                CUSTOMER_PRODUCT_1002_2002_HK,
+                CUSTOMER_1002_HK,
+                PRODUCT_2002_HK,
+                Decimal("0.870000"),
+            ),
+        ]
+
+        effsat_rows = fetch_all(
+            conn,
+            'SELECT "CustomerProduct_hk", "valid_from", "valid_to" '
+            'FROM "RelationValidity" ORDER BY "valid_from"',
+        )
+        assert effsat_rows == [
+            (
+                CUSTOMER_PRODUCT_1001_2001_HK,
+                datetime(2026, 1, 5, 0, 0, 0),
+                datetime(2026, 12, 31, 23, 59, 59),
+            ),
+            (
+                CUSTOMER_PRODUCT_1002_2002_HK,
+                datetime(2026, 1, 6, 0, 0, 0),
+                datetime(2026, 12, 31, 23, 59, 59),
+            ),
+        ]
+
+        samlink_rows = fetch_all(
+            conn,
+            'SELECT "CustomerMatch_hk", "master_Customer_hk", "duplicate_Customer_hk", "confidence" '
+            'FROM "CustomerMatch"',
+        )
+        assert samlink_rows == [
+            (
+                CUSTOMER_MATCH_1001_HK,
+                CUSTOMER_1001_HK,
+                CUSTOMER_1001_HK,
+                Decimal("0.910000"),
+            )
+        ]
+
+        bridge_rows = fetch_all(
+            conn,
+            'SELECT "Customer_hk", "CustomerProduct_hk", "Product_hk" '
+            'FROM "bridge_CustomerProductBridge" ORDER BY "CustomerProduct_hk"',
+        )
+        assert bridge_rows == [
+            (CUSTOMER_1002_HK, CUSTOMER_PRODUCT_1002_2002_HK, PRODUCT_2002_HK),
+            (CUSTOMER_1001_HK, CUSTOMER_PRODUCT_1001_2001_HK, PRODUCT_2001_HK),
+        ]
+
+        pit_rows = fetch_all(
+            conn,
+            'SELECT "Customer_hk", "CustomerDetails_hash_diff" '
+            'FROM "pit_CustomerPit" ORDER BY "Customer_hk"',
+        )
+        assert len(pit_rows) == 2
+        assert all(customer_hk in {CUSTOMER_1001_HK, CUSTOMER_1002_HK} for customer_hk, _ in pit_rows)
+        assert all(isinstance(hash_diff, str) and len(hash_diff) == 64 for _, hash_diff in pit_rows)
+    finally:
+        conn.close()
+
+
+def test_e2e_duckdb_executes_every_generated_sql_file(
+    duckdb_generated_result,
+    all_entity_source_rows,
+):
+    """The canonical DuckDB fixture should execute the full generated SQL file map."""
+    conn = duckdb.connect(":memory:")
+    try:
+        load_source_tables(conn, all_entity_source_rows)
+        _create_non_historized_targets(conn)
+        _execute_all_generated_duckdb_files(conn, duckdb_generated_result.files)
+        _load_historized_targets(conn)
+    finally:
+        conn.close()
+
+
+def _create_non_historized_targets(conn: duckdb.DuckDBPyConnection) -> None:
+    conn.execute(
+        'CREATE TABLE "CurrentStatus" ('
+        '"Customer_hk" CHAR(64), '
+        '"load_ts" TIMESTAMP, '
+        '"record_source" VARCHAR, '
+        '"status" VARCHAR, '
+        '"updated_at" TIMESTAMP)'
+    )
+    conn.execute(
+        'CREATE TABLE "ActiveRelation" ('
+        '"ActiveRelation_hk" CHAR(64), '
+        '"load_ts" TIMESTAMP, '
+        '"record_source" VARCHAR, '
+        '"Customer_hk" CHAR(64), '
+        '"Product_hk" CHAR(64), '
+        '"score" DECIMAL(18,6))'
+    )
+    conn.execute(
+        'CREATE TABLE "RelationValidity" ('
+        '"CustomerProduct_hk" CHAR(64), '
+        '"load_ts" TIMESTAMP, '
+        '"record_source" VARCHAR, '
+        '"valid_from" TIMESTAMP, '
+        '"valid_to" TIMESTAMP)'
+    )
+    conn.execute(
+        'CREATE TABLE "CustomerMatch" ('
+        '"CustomerMatch_hk" CHAR(64), '
+        '"load_ts" TIMESTAMP, '
+        '"record_source" VARCHAR, '
+        '"master_Customer_hk" CHAR(64), '
+        '"duplicate_Customer_hk" CHAR(64), '
+        '"confidence" DECIMAL(18,6))'
+    )
+
+
+def _execute_all_generated_duckdb_files(
+    conn: duckdb.DuckDBPyConnection,
+    files: dict[str, str],
+) -> None:
+    staging_prefixes = ("staging/hubs/", "staging/satellites/", "staging/links/")
+    raw_prefixes = ("hubs/", "satellites/", "links/")
+    view_prefixes = ("views/",)
+
+    executed_paths = {
+        path
+        for prefixes in (staging_prefixes, raw_prefixes, view_prefixes)
+        for path in files
+        if any(path.startswith(prefix) for prefix in prefixes)
+    }
+    assert executed_paths == set(files)
+
+    execute_sql_files(conn, files, prefixes=staging_prefixes)
+    execute_sql_files(conn, files, prefixes=raw_prefixes)
+    execute_sql_files(conn, files, prefixes=view_prefixes)
+
+
+def _load_historized_targets(conn: duckdb.DuckDBPyConnection) -> None:
+    conn.execute('INSERT INTO "Customer" SELECT * FROM "stg_Customer"')
+    conn.execute('INSERT INTO "Product" SELECT * FROM "stg_Product"')
+    conn.execute('INSERT INTO "CustomerDetails" SELECT * FROM "stg_CustomerDetails"')
+    conn.execute('INSERT INTO "CustomerProduct" SELECT * FROM "stg_CustomerProduct"')
 
 
 # ---------------------------------------------------------------------------
