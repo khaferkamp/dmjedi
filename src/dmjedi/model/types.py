@@ -28,6 +28,35 @@ _TYPE_MAP: dict[str, dict[str, str]] = {
     "float": {"default": "FLOAT", "postgres": "DOUBLE PRECISION", "spark": "FLOAT"},
     "varchar": {"default": "VARCHAR(255)", "postgres": "VARCHAR(255)", "spark": "STRING"},
     "binary": {"default": "BINARY", "postgres": "BYTEA", "spark": "BINARY"},
+    # System column types (D-03: CHAR(64) hex string for SHA-256 hash keys)
+    "hashkey": {
+        "default": "CHAR(64)",
+        "postgres": "CHAR(64)",
+        "spark": "CHAR(64)",
+        "duckdb": "CHAR(64)",
+        "databricks": "CHAR(64)",
+    },
+    "hash_diff": {
+        "default": "CHAR(64)",
+        "postgres": "CHAR(64)",
+        "spark": "CHAR(64)",
+        "duckdb": "CHAR(64)",
+        "databricks": "CHAR(64)",
+    },
+    "load_ts": {
+        "default": "TIMESTAMP",
+        "postgres": "TIMESTAMP",
+        "spark": "TIMESTAMP",
+        "duckdb": "TIMESTAMP",
+        "databricks": "TIMESTAMP",
+    },
+    "record_source": {
+        "default": "VARCHAR(255)",
+        "postgres": "VARCHAR(255)",
+        "spark": "VARCHAR(255)",
+        "duckdb": "VARCHAR(255)",
+        "databricks": "VARCHAR(255)",
+    },
 }
 
 _PYSPARK_MAP: dict[str, str] = {
@@ -44,7 +73,7 @@ _PYSPARK_MAP: dict[str, str] = {
     "binary":    "BinaryType()",
 }
 
-SUPPORTED_DIALECTS = ["default", "postgres", "spark"]
+SUPPORTED_DIALECTS = ["default", "postgres", "spark", "duckdb", "databricks"]
 
 
 def map_type(dvml_type: str, dialect: str = "default") -> str:

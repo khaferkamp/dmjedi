@@ -6,6 +6,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
+import dmjedi.cli.main as cli_main
 from dmjedi.cli.errors import format_lint_diagnostic, format_parse_error
 from dmjedi.cli.main import app
 from dmjedi.lang.ast import SourceLocation
@@ -77,6 +78,43 @@ def test_generate_nonexistent_file() -> None:
     result = runner.invoke(app, ["generate", "nonexistent.dv"])
     assert result.exit_code == 1
     assert "not found" in result.output.lower()
+
+
+def test_generate_streaming_mode(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "generate",
+            "examples/sales-domain.dv",
+            "--target",
+            "spark-declarative",
+            "--mode",
+            "streaming",
+            "--output",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 0
+    generated_files = list(tmp_path.rglob("*.py"))
+    assert generated_files
+
+
+def test_generate_invalid_mode(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "generate",
+            "examples/sales-domain.dv",
+            "--target",
+            "spark-declarative",
+            "--mode",
+            "invalid",
+            "--output",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 1
+    assert "Invalid mode" in result.output
 
 
 # --- docs command ---
@@ -214,6 +252,7 @@ def test_cli_dialect_in_help() -> None:
     result = runner.invoke(app, ["generate", "--help"])
     assert result.exit_code == 0
     assert "--dialect" in result.output
+    assert "--mode" in result.output
     assert "default" in result.output
 
 
@@ -258,7 +297,8 @@ def test_cli_dialect_non_sql_jinja_warns(tmp_path: Path) -> None:
     )
     assert result.exit_code == 0
     # Warning must be present in combined output
-    combined = result.output + (result.stderr if hasattr(result, "stderr") and result.stderr else "")
+    stderr = result.stderr if hasattr(result, "stderr") and result.stderr else ""
+    combined = result.output + stderr
     assert "Warning" in combined or "warning" in combined.lower()
     assert "dialect" in combined.lower()
 
@@ -279,3 +319,31 @@ def test_cli_dialect_invalid_value(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code != 0
+
+
+def test_lsp_command_starts_server(monkeypatch) -> None:
+    started: list[bool] = []
+
+    def fake_start_server() -> None:
+        started.append(True)
+
+    monkeypatch.setattr(cli_main, "start_server", fake_start_server)
+
+    result = runner.invoke(app, ["lsp"])
+
+    assert result.exit_code == 0
+    assert started == [True]
+
+
+def test_mcp_command_invokes_start_server(monkeypatch) -> None:
+    started: list[bool] = []
+
+    def fake_start_server() -> None:
+        started.append(True)
+
+    monkeypatch.setattr(cli_main, "start_mcp_server", fake_start_server)
+
+    result = runner.invoke(app, ["mcp"])
+
+    assert result.exit_code == 0
+    assert started == [True]

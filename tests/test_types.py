@@ -74,4 +74,40 @@ def test_existing_types_unchanged():
 
 
 def test_supported_dialects():
-    assert set(SUPPORTED_DIALECTS) == {"default", "postgres", "spark"}
+    assert set(SUPPORTED_DIALECTS) == {"default", "postgres", "spark", "duckdb", "databricks"}
+
+
+class TestSystemTypeEntries:
+    """Tests for system column types (D-03: CHAR(64) for hash keys)."""
+
+    def test_system_type_hashkey_default(self):
+        """hashkey maps to CHAR(64) for default dialect."""
+        assert map_type("hashkey", "default") == "CHAR(64)"
+
+    def test_system_type_hashkey_postgres(self):
+        """hashkey maps to CHAR(64) for postgres dialect."""
+        assert map_type("hashkey", "postgres") == "CHAR(64)"
+
+    def test_system_type_hashkey_duckdb(self):
+        """hashkey maps to CHAR(64) for duckdb dialect."""
+        assert map_type("hashkey", "duckdb") == "CHAR(64)"
+
+    def test_system_type_hashkey_databricks(self):
+        """hashkey maps to CHAR(64) for databricks dialect."""
+        assert map_type("hashkey", "databricks") == "CHAR(64)"
+
+    def test_system_type_hash_diff_default(self):
+        """hash_diff maps to CHAR(64) for default dialect."""
+        assert map_type("hash_diff", "default") == "CHAR(64)"
+
+    def test_system_type_hash_diff_postgres(self):
+        """hash_diff maps to CHAR(64) for postgres dialect."""
+        assert map_type("hash_diff", "postgres") == "CHAR(64)"
+
+    def test_system_type_hash_diff_duckdb(self):
+        """hash_diff maps to CHAR(64) for duckdb dialect."""
+        assert map_type("hash_diff", "duckdb") == "CHAR(64)"
+
+    def test_system_type_hash_diff_databricks(self):
+        """hash_diff maps to CHAR(64) for databricks dialect."""
+        assert map_type("hash_diff", "databricks") == "CHAR(64)"

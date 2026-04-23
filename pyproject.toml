@@ -1,6 +1,6 @@
 [project]
 name = "dmjedi"
-version = "0.1.0"
+version = "0.2.0"
 description = "Data Modeling Jedi — CLI for Data Vault 2.1 modeling and data warehouse automation"
 readme = "README.md"
 license = "AGPL-3.0-or-later"
@@ -23,6 +23,7 @@ dependencies = [
     "typer>=0.12",
     "pydantic>=2.0",
     "lark>=1.2",
+    "mcp>=1.20,<2",
     "pygls>=1.3",
     "jinja2>=3.1",
     "rich>=13.0",
@@ -30,6 +31,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "duckdb>=1.5.2",
+    "sqlglot>=30.3.0",
     "pytest>=9.0.3",
     "pytest-cov>=5.0",
     "pytest-snapshot>=0.9",
@@ -66,5 +69,8 @@ plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short --cov --cov-report=term-missing --cov-fail-under=85"
 pythonpath = ["src"]
+
+[tool.coverage.run]
+source = ["src/dmjedi"]

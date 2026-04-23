@@ -31,12 +31,23 @@ dmjedi validate examples/
 ### Generate pipeline code
 
 ```bash
-# Generate SQL DDL
-dmjedi generate examples/sales-domain.dv --target sql-jinja --output output/
+# Generate SQL DDL for DuckDB
+dmjedi generate examples/sales-domain.dv --target sql-jinja --dialect duckdb --output output/duckdb
 
-# Generate Databricks DLT Python
-dmjedi generate examples/sales-domain.dv --target spark-declarative --output output/
+# Generate SQL DDL for Databricks SQL
+dmjedi generate examples/sales-domain.dv --target sql-jinja --dialect databricks --output output/databricks
+
+# Generate SQL DDL for PostgreSQL
+dmjedi generate examples/sales-domain.dv --target sql-jinja --dialect postgres --output output/postgres
+
+# Generate Databricks DLT Python (batch)
+dmjedi generate examples/sales-domain.dv --target spark-declarative --mode batch --output output/spark-batch
+
+# Generate Databricks DLT Python (streaming)
+dmjedi generate examples/sales-domain.dv --target spark-declarative --mode streaming --output output/spark-streaming
 ```
+
+Checked-in example outputs for all supported targets live under `examples/generated/`.
 
 ### Generate documentation
 
@@ -103,10 +114,10 @@ DMJEDI validates models at three levels:
 
 | Target | Flag | Output |
 |--------|------|--------|
-| SQL (Jinja2) | `--target sql-jinja` | `CREATE TABLE` DDL with DV2.1 standard columns |
-| Spark DLT | `--target spark-declarative` | Databricks `@dlt.table` Python files with hash keys |
+| SQL (Jinja2) | `--target sql-jinja --dialect duckdb|databricks|postgres` | Dialect-specific `CREATE TABLE` DDL and staging views |
+| Spark DLT | `--target spark-declarative --mode batch|streaming` | Databricks DLT Python files with batch or streaming source reads |
 
-SQL generation supports type mapping across dialects (default, PostgreSQL, Spark).
+SQL generation supports type mapping across dialects (`duckdb`, `databricks`, `postgres`) and Spark Declarative supports both `batch` and `streaming` modes.
 
 Generators are pluggable — implement `BaseGenerator` and register it to add new targets (dbt, Airflow, etc.).
 
@@ -137,6 +148,8 @@ pytest                          # Run tests
 ruff check . && ruff format .   # Lint & format
 mypy src/                       # Type check
 ```
+
+Release notes live in `CHANGELOG.md`, and the manual ship procedure lives in `docs/release-checklist.md`.
 
 ## License
 
